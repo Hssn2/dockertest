@@ -15,6 +15,7 @@ namespace dockertest.Controllers
 
         public IActionResult Index()
         {
+            ViewBag.AppVersion = Environment.GetEnvironmentVariable("APP_VERSION") ?? "dev";
             return View();
         }
 

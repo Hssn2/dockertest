@@ -1,0 +1,108 @@
+name: Auto Release
+
+on:
+  push:
+    branches:
+      - release
+
+permissions:
+  contents: write
+  packages: write
+
+jobs:
+  build-and-push:
+    if: ${{ !contains(github.event.head_commit.message, '[skip ci]') }}
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Get last tag
+        id: lasttag
+        run: |
+          git fetch --tags
+          LAST=$(git describe --tags --abbrev=0 2>/dev/null || echo "v0.0.0")
+          echo "last=$LAST" >> "$GITHUB_OUTPUT"
+
+      - name: Determine bump type
+        id: bump
+        run: |
+          MSG="${{ github.event.head_commit.message }}"
+          if echo "$MSG" | grep -qi "major"; then
+            echo "type=major" >> "$GITHUB_OUTPUT"
+          elif echo "$MSG" | grep -qi "minor"; then
+            echo "type=minor" >> "$GITHUB_OUTPUT"
+          else
+            echo "type=patch" >> "$GITHUB_OUTPUT"
+          fi
+
+      - name: Calculate new version
+        id: version
+        run: |
+          LAST="${{ steps.lasttag.outputs.last }}"
+          LAST="${LAST#v}"
+          IFS='.' read -r MAJOR MINOR PATCH <<< "$LAST"
+          MAJOR=${MAJOR:-0}
+          MINOR=${MINOR:-0}
+          PATCH=${PATCH:-0}
+
+          if [ "${{ steps.bump.outputs.type }}" = "major" ]; then
+            MAJOR=$((MAJOR + 1)); MINOR=0; PATCH=0
+          elif [ "${{ steps.bump.outputs.type }}" = "minor" ]; then
+            MINOR=$((MINOR + 1)); PATCH=0
+          else
+            PATCH=$((PATCH + 1))
+          fi
+
+          echo "version=${MAJOR}.${MINOR}.${PATCH}" >> "$GITHUB_OUTPUT"
+          echo "tag=v${MAJOR}.${MINOR}.${PATCH}" >> "$GITHUB_OUTPUT"
+
+      - name: Set image name
+        id: image
+        run: |
+          IMAGE=$(echo "ghcr.io/${{ github.repository }}" | tr '[:upper:]' '[:lower:]')
+          echo "name=$IMAGE" >> "$GITHUB_OUTPUT"
+
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@v3
+
+      - name: Log in to GHCR
+        uses: docker/login-action@v3
+        with:
+          registry: ghcr.io
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Build and push image
+        uses: docker/build-push-action@v6
+        with:
+          context: .
+          push: true
+          build-args: |
+            APP_VERSION=${{ steps.version.outputs.version }}
+          tags: |
+            ${{ steps.image.outputs.name }}:${{ steps.version.outputs.version }}
+            ${{ steps.image.outputs.name }}:latest
+
+      - name: Create GitHub Release
+        uses: softprops/action-gh-release@v2
+        with:
+          tag_name: ${{ steps.version.outputs.tag }}
+          name: Release ${{ steps.version.outputs.tag }}
+          generate_release_notes: true
+          body: |
+            ## Docker
+
+            ```bash
+            docker pull ${{ steps.image.outputs.name }}:${{ steps.version.outputs.version }}
+            docker run -p 8080:8080 ${{ steps.image.outputs.name }}:${{ steps.version.outputs.version }}
+            ```
+
+            | Bump | Commit mesajında |
+            |------|----------------|
+            | major | `major` geçmeli |
+            | minor | `minor` geçmeli |
+            | patch | varsayılan |
