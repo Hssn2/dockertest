@@ -24,4 +24,10 @@ app.MapControllerRoute(
     name: "default",
     pattern: "{controller=Home}/{action=Index}/{id?}");
 
+app.MapGet("/health", () =>
+{
+    var version = Environment.GetEnvironmentVariable("APP_VERSION") ?? "dev";
+    return Results.Ok(new { status = "healthy", version });
+});
+
 app.Run();

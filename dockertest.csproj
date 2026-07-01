@@ -13,4 +13,11 @@
     <PackageReference Include="Microsoft.VisualStudio.Azure.Containers.Tools.Targets" Version="1.22.1" />
   </ItemGroup>
 
+  <ItemGroup>
+    <Compile Remove="dockertest-agent/**" />
+    <Content Remove="dockertest-agent/**" />
+    <EmbeddedResource Remove="dockertest-agent/**" />
+    <None Remove="dockertest-agent/**" />
+  </ItemGroup>
+
 </Project>
