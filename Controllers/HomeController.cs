@@ -25,6 +25,8 @@ namespace dockertest.Controllers
             return View();
         }
 
+        public IActionResult Xox() => View();
+
         [ResponseCache(Duration = 0, Location = ResponseCacheLocation.None, NoStore = true)]
         public IActionResult Error()
         {

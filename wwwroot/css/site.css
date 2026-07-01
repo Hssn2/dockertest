@@ -47,3 +47,35 @@ body {
   background: #8aa4ff;
   color: #fff;
 }
+
+.xox-board {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 8px;
+  max-width: 300px;
+}
+
+.xox-cell {
+  aspect-ratio: 1;
+  background: #1a1d27;
+  border: 2px solid #2e3345;
+  border-radius: 10px;
+  font-size: 2.25rem;
+  font-weight: 700;
+  cursor: pointer;
+  color: var(--text);
+  transition: border-color 0.15s, transform 0.1s;
+}
+
+.xox-cell:hover:not(:disabled) {
+  border-color: var(--accent);
+}
+
+.xox-cell.x { color: #ff6b8a; }
+.xox-cell.o { color: #4dd9c0; }
+.xox-cell:disabled { cursor: default; }
+
+.xox-status {
+  font-weight: 600;
+  color: var(--muted);
+}

@@ -1,0 +1,21 @@
+@{
+    ViewData["Title"] = "XOX";
+}
+
+<div class="text-center page-hero">
+    <h1 class="h3 mb-2">XOX</h1>
+    <p class="text-muted small mb-4">Sırayla oyna — X ile O</p>
+
+    <p id="xox-status" class="xox-status mb-3">Sıra: X</p>
+    <div id="xox-board" class="xox-board mx-auto mb-3">
+        @for (var i = 0; i < 9; i++)
+        {
+            <button type="button" class="xox-cell" data-index="@i" aria-label="Hücre @(i + 1)"></button>
+        }
+    </div>
+    <button type="button" id="xox-reset" class="btn btn-accent btn-sm">Yeniden Başla</button>
+</div>
+
+@section Scripts {
+    <script src="~/js/xox.js" asp-append-version="true"></script>
+}
