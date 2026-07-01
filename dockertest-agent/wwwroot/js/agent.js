@@ -56,12 +56,22 @@ async function loadStatus() {
 
 async function loadReleases() {
     const res = await fetch('/api/releases');
-    const releases = await res.json();
+    const data = await res.json();
+    const releases = data.items ?? data;
+
     if (!releases.length) {
-        releasesList.innerHTML = '<p class="text-muted">Release bulunamadı. GitHub token gerekebilir.</p>';
+        const hint = data.hint || 'Release bulunamadı.';
+        const tokenNote = data.tokenConfigured
+            ? ''
+            : '<br><code>-e Agent__GitHubToken=ghp_xxx</code> ile agent\'ı başlat. PAT: <strong>read:packages</strong> + repo read';
+        releasesList.innerHTML = `<p class="text-muted">${hint}${tokenNote}</p>`;
         return;
     }
-    releasesList.innerHTML = releases.map(r => {
+
+    const sourceNote = data.source === 'docker-local'
+        ? '<p class="text-muted small mb-2">Kaynak: bu makinedeki Docker image\'lar</p>'
+        : '';
+    releasesList.innerHTML = sourceNote + releases.map(r => {
         const isCurrent = r.version === activeVersion;
         return `
         <div class="version-row ${isCurrent ? 'current' : ''}">

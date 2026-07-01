@@ -16,4 +16,9 @@ public class AgentOptions
     public int HealthCheckRetries { get; set; } = 15;
     public int HealthCheckIntervalSeconds { get; set; } = 2;
     public string StateDirectory { get; set; } = "";
+
+    public string ResolveToken() =>
+        !string.IsNullOrWhiteSpace(GitHubToken)
+            ? GitHubToken
+            : Environment.GetEnvironmentVariable("GITHUB_TOKEN") ?? "";
 }

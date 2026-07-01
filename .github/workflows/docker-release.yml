@@ -4,6 +4,10 @@ on:
   push:
     branches:
       - release
+    paths:
+      - '**'
+      - '!dockertest-agent/**'
+      - '!.github/workflows/docker-agent-release.yml'
 
 permissions:
   contents: write

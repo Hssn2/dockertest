@@ -49,8 +49,8 @@ public class UpdateApiController : ControllerBase
     [HttpGet("releases")]
     public async Task<IActionResult> Releases(CancellationToken ct)
     {
-        var list = await _releases.GetReleasesAsync(ct);
-        return Ok(list);
+        var catalog = await _releases.GetCatalogAsync(ct);
+        return Ok(catalog);
     }
 
     [HttpGet("containers")]

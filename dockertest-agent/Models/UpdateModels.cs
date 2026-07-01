@@ -47,6 +47,14 @@ public class ManagedContainer
     public bool IsActive { get; set; }
 }
 
+public class ReleasesResponse
+{
+    public IReadOnlyList<ReleaseVersion> Items { get; set; } = [];
+    public string Source { get; set; } = "";
+    public string? Hint { get; set; }
+    public bool TokenConfigured { get; set; }
+}
+
 public class AgentState
 {
     public string? ActiveContainerName { get; set; }

@@ -137,6 +137,28 @@ public class DockerService
         return images.Any(i => i.RepoTags?.Any(t => string.Equals(t, tag, StringComparison.OrdinalIgnoreCase)) == true);
     }
 
+    public async Task<IReadOnlyList<string>> ListLocalImageTagsAsync(CancellationToken ct)
+    {
+        var images = await _client.Images.ListImagesAsync(new ImagesListParameters { All = false }, ct);
+        var prefix = _options.ImageName.ToLowerInvariant();
+        var tags = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
+
+        foreach (var image in images)
+        {
+            foreach (var repoTag in image.RepoTags ?? [])
+            {
+                if (!repoTag.StartsWith(prefix + ":", StringComparison.OrdinalIgnoreCase))
+                    continue;
+
+                var tag = repoTag[(prefix.Length + 1)..];
+                if (!tag.Equals("latest", StringComparison.OrdinalIgnoreCase))
+                    tags.Add(tag);
+            }
+        }
+
+        return tags.OrderDescending(StringComparer.Ordinal).ToList();
+    }
+
     private string ExtractVersion(string containerName)
     {
         var prefix = _options.ContainerNamePrefix;
