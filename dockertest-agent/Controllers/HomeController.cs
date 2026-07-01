@@ -8,7 +8,7 @@ public class HomeController : Controller
 {
     public IActionResult Index() => View();
 }
-
+//yorum
 [ApiController]
 [Route("api")]
 public class UpdateApiController : ControllerBase
