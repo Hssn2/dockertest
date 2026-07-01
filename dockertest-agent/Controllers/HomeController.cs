@@ -74,7 +74,7 @@ public class UpdateApiController : ControllerBase
             }
             catch
             {
-                // errors stored in state
+                // errors stored in state or db
             }
         });
 
