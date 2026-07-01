@@ -19,6 +19,16 @@ namespace dockertest.Controllers
             return View();
         }
 
+        public IActionResult Hakkimda()
+        {
+            return View();
+        }
+
+        public IActionResult Projeler()
+        {
+            return View();
+        }
+
         public IActionResult Privacy()
         {
             return View();
