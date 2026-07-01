@@ -1,0 +1,11 @@
+@{
+    ViewData["Title"] = "Güncelleme";
+    var agentUrl = ViewBag.AgentUrl as string ?? "http://localhost:8080";
+}
+
+<div class="text-center page-hero">
+    <h1 class="h3 mb-3">Güncelleme</h1>
+    <p class="text-muted mb-4">Sürüm geçişi güncelleme agent üzerinden yapılır.</p>
+    <a href="@agentUrl" class="btn btn-accent btn-lg" target="_blank" rel="noopener">Agent paneline git</a>
+    <p class="text-muted small mt-3"><code>@agentUrl</code></p>
+</div>

@@ -6,12 +6,10 @@ namespace dockertest.Controllers
 {
     public class HomeController : Controller
     {
-        private readonly ILogger<HomeController> _logger;
         private readonly IConfiguration _configuration;
 
-        public HomeController(ILogger<HomeController> logger, IConfiguration configuration)
+        public HomeController(IConfiguration configuration)
         {
-            _logger = logger;
             _configuration = configuration;
         }
 
@@ -21,25 +19,10 @@ namespace dockertest.Controllers
             return View();
         }
 
-        public IActionResult Hakkimda()
-        {
-            return View();
-        }
-
-        public IActionResult Projeler()
-        {
-            return View();
-        }
-
-        public IActionResult Privacy()
-        {
-            return View();
-        }
-
         public IActionResult Guncelleme()
         {
-            var url = _configuration["UpdateAgent:Url"] ?? "http://localhost:8080";
-            return Redirect(url);
+            ViewBag.AgentUrl = _configuration["UpdateAgent:Url"] ?? "http://localhost:8080";
+            return View();
         }
 
         [ResponseCache(Duration = 0, Location = ResponseCacheLocation.None, NoStore = true)]

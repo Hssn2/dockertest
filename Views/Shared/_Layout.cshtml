@@ -3,38 +3,18 @@
 <head>
     <meta charset="utf-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-    <title>@ViewData["Title"] - Hasan Günay</title>
+    <title>@ViewData["Title"] - dockertest</title>
     <link rel="stylesheet" href="~/lib/bootstrap/dist/css/bootstrap.min.css" />
     <link rel="stylesheet" href="~/css/site.css" asp-append-version="true" />
-    <link rel="stylesheet" href="~/dockertest.styles.css" asp-append-version="true" />
 </head>
 <body>
     <header>
         <nav class="navbar navbar-expand-sm navbar-dark mb-3">
             <div class="container">
-                <a class="navbar-brand fw-semibold" asp-controller="Home" asp-action="Index">Hasan Günay</a>
-                <button class="navbar-toggler" type="button" data-bs-toggle="collapse" data-bs-target="#mainNav"
-                        aria-controls="mainNav" aria-expanded="false" aria-label="Menü">
-                    <span class="navbar-toggler-icon"></span>
-                </button>
-                <div class="navbar-collapse collapse" id="mainNav">
-                    <ul class="navbar-nav ms-auto">
-                        <li class="nav-item">
-                            <a class="nav-link" asp-controller="Home" asp-action="Index">Ana Sayfa</a>
-                        </li>
-                        <li class="nav-item">
-                            <a class="nav-link" asp-controller="Home" asp-action="Hakkimda">Hakkımda</a>
-                        </li>
-                        <li class="nav-item">
-                            <a class="nav-link" asp-controller="Home" asp-action="Projeler">Projeler</a>
-                        </li>
-                        <li class="nav-item">
-                            <a class="nav-link" asp-controller="Home" asp-action="Privacy">Gizlilik</a>
-                        </li>
-                        <li class="nav-item">
-                            <a class="nav-link text-warning" asp-controller="Home" asp-action="Guncelleme">Güncelleme</a>
-                        </li>
-                    </ul>
+                <a class="navbar-brand fw-semibold" asp-controller="Home" asp-action="Index">dockertest</a>
+                <div class="navbar-nav ms-auto flex-row gap-2">
+                    <a class="nav-link" asp-controller="Home" asp-action="Index">Ana Sayfa</a>
+                    <a class="nav-link" asp-controller="Home" asp-action="Guncelleme">Güncelleme</a>
                 </div>
             </div>
         </nav>
@@ -44,15 +24,7 @@
             @RenderBody()
         </main>
     </div>
-
-    <footer class="footer py-3 mt-auto">
-        <div class="container text-center">
-            &copy; 2026 Hasan Günay &middot; Docker CI/CD Demo
-        </div>
-    </footer>
-    <script src="~/lib/jquery/dist/jquery.min.js"></script>
     <script src="~/lib/bootstrap/dist/js/bootstrap.bundle.min.js"></script>
-    <script src="~/js/site.js" asp-append-version="true"></script>
     @await RenderSectionAsync("Scripts", required: false)
 </body>
 </html>
