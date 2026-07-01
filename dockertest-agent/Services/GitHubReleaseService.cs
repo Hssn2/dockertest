@@ -82,11 +82,11 @@ public class GitHubReleaseService
 
     private static bool IsAppRelease(string tag, string? name)
     {
-        if (tag.StartsWith("agent-", StringComparison.OrdinalIgnoreCase))
-            return false;
         if (name?.StartsWith("Agent", StringComparison.OrdinalIgnoreCase) == true)
             return false;
-        return true;
+
+        var version = tag.StartsWith('v') ? tag[1..] : tag;
+        return AppVersionFilter.IsAppVersion(version);
     }
 
     private async Task<IReadOnlyList<ReleaseVersion>> TryGitHubReleasesAsync(string? token, CancellationToken ct)
@@ -114,6 +114,9 @@ public class GitHubReleaseService
                     continue;
 
                 var version = tag.StartsWith('v') ? tag[1..] : tag;
+                if (!AppVersionFilter.IsAppVersion(version))
+                    continue;
+
                 list.Add(new ReleaseVersion
                 {
                     Tag = tag,
@@ -167,6 +170,9 @@ public class GitHubReleaseService
                     if (string.IsNullOrWhiteSpace(tag) || tag.Equals("latest", StringComparison.OrdinalIgnoreCase))
                         continue;
                     if (!IsAppRelease(tag, null))
+                        continue;
+
+                    if (!AppVersionFilter.IsAppVersion(tag))
                         continue;
 
                     if (!versions.ContainsKey(tag))

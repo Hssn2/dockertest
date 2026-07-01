@@ -140,23 +140,48 @@ public class DockerService
     public async Task<IReadOnlyList<string>> ListLocalImageTagsAsync(CancellationToken ct)
     {
         var images = await _client.Images.ListImagesAsync(new ImagesListParameters { All = false }, ct);
-        var prefix = _options.ImageName.ToLowerInvariant();
+        var imageName = _options.ImageName;
         var tags = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
 
         foreach (var image in images)
         {
             foreach (var repoTag in image.RepoTags ?? [])
             {
-                if (!repoTag.StartsWith(prefix + ":", StringComparison.OrdinalIgnoreCase))
+                if (!AppVersionFilter.IsExactImageRepo(repoTag, imageName))
                     continue;
 
-                var tag = repoTag[(prefix.Length + 1)..];
-                if (!tag.Equals("latest", StringComparison.OrdinalIgnoreCase))
-                    tags.Add(tag);
+                var tag = repoTag[(repoTag.LastIndexOf(':') + 1)..];
+                if (tag.Equals("latest", StringComparison.OrdinalIgnoreCase))
+                    continue;
+                if (!AppVersionFilter.IsAppVersion(tag))
+                    continue;
+
+                tags.Add(tag);
             }
         }
 
         return tags.OrderDescending(StringComparer.Ordinal).ToList();
+    }
+
+    public async Task StopContainersOnPortAsync(int hostPort, CancellationToken ct)
+    {
+        var containers = await _client.Containers.ListContainersAsync(new ContainersListParameters { All = true }, ct);
+        foreach (var container in containers.Where(c => c.Ports.Any(p => p.PublicPort == (uint)hostPort)))
+        {
+            var name = container.Names.FirstOrDefault()?.TrimStart('/') ?? container.ID;
+            await StopContainerAsync(name, ct);
+        }
+    }
+
+    public async Task CleanupCandidatesAsync(CancellationToken ct)
+    {
+        var all = await _client.Containers.ListContainersAsync(new ContainersListParameters { All = true }, ct);
+        foreach (var container in all)
+        {
+            var name = container.Names.FirstOrDefault()?.TrimStart('/') ?? "";
+            if (name.Contains("_candidate", StringComparison.OrdinalIgnoreCase))
+                await RemoveContainerAsync(name, ct);
+        }
     }
 
     private string ExtractVersion(string containerName)

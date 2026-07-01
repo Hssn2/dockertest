@@ -41,41 +41,30 @@ public class UpdateOrchestrator
         var previousContainer = _store.GetState().ActiveContainerName;
         var previousVersion = _store.GetState().ActiveVersion;
         var prodName = $"{_options.ContainerNamePrefix}{version}";
-        var candidateName = $"{prodName}_candidate";
 
         try
         {
             Begin(version, previousVersion);
+            await _docker.CleanupCandidatesAsync(ct);
 
-            await SetPhaseAsync(UpdatePhase.PullingImage, "Docker image indiriliyor...", 10, ct);
-            var pullProgress = new Progress<string>(msg => _ = BroadcastLog(msg));
-            await _docker.PullImageAsync(version, pullProgress, ct);
-
-            await SetPhaseAsync(UpdatePhase.StartingCandidate, $"Aday container başlatılıyor (port {_options.CandidateHostPort})...", 30, ct);
-            await _docker.RemoveContainerAsync(candidateName, ct);
-            await _docker.RunContainerAsync(candidateName, _options.CandidateHostPort, version, ct);
-
-            await SetPhaseAsync(UpdatePhase.HealthCheckingCandidate, "Aday sürüm sağlık kontrolünden geçiriliyor...", 45, ct);
-            var candidateHealthy = await WaitForHealthAsync(_options.CandidateHostPort, ct);
-            if (!candidateHealthy)
-                throw new InvalidOperationException("Aday container sağlık kontrolünü geçemedi. Güncelleme iptal edildi.");
-
-            await SetPhaseAsync(UpdatePhase.StoppingCurrent, "Mevcut sürüm durduruluyor (silinmiyor)...", 60, ct);
+            await SetPhaseAsync(UpdatePhase.StoppingCurrent, "Çalışan sürüm durduruluyor...", 20, ct);
+            await _docker.StopContainersOnPortAsync(_options.AppHostPort, ct);
             if (!string.IsNullOrWhiteSpace(previousContainer))
                 await _docker.StopContainerAsync(previousContainer, ct);
 
-            await _docker.StopContainerAsync(candidateName, ct);
-            await _docker.RemoveContainerAsync(candidateName, ct);
+            await SetPhaseAsync(UpdatePhase.PullingImage, "Yeni image indiriliyor...", 45, ct);
+            var pullProgress = new Progress<string>(msg => _ = BroadcastLog(msg));
+            await _docker.PullImageAsync(version, pullProgress, ct);
 
-            await SetPhaseAsync(UpdatePhase.StartingProduction, $"Yeni sürüm port {_options.AppHostPort} üzerinde başlatılıyor...", 75, ct);
+            await SetPhaseAsync(UpdatePhase.StartingProduction, $"Port {_options.AppHostPort} üzerinde yeni sürüm başlatılıyor...", 70, ct);
             await _docker.RemoveContainerAsync(prodName, ct);
             await _docker.RunContainerAsync(prodName, _options.AppHostPort, version, ct);
 
-            await SetPhaseAsync(UpdatePhase.HealthCheckingProduction, "Canlı sürüm doğrulanıyor...", 90, ct);
-            var prodHealthy = await WaitForHealthAsync(_options.AppHostPort, ct);
-            if (!prodHealthy)
+            await SetPhaseAsync(UpdatePhase.HealthCheckingProduction, "Uygulama kontrol ediliyor...", 90, ct);
+            var healthy = await WaitForHealthAsync(_options.AppHostPort, ct);
+            if (!healthy)
             {
-                await SetPhaseAsync(UpdatePhase.RollingBack, "Yeni sürüm hatalı! Eski sürüme dönülüyor...", 95, ct);
+                await SetPhaseAsync(UpdatePhase.RollingBack, "Yeni sürüm açılmadı, eskisine dönülüyor...", 95, ct);
                 await _docker.StopContainerAsync(prodName, ct);
 
                 if (!string.IsNullOrWhiteSpace(previousContainer))
@@ -86,11 +75,11 @@ public class UpdateOrchestrator
                         throw new InvalidOperationException("Rollback başarısız! Manuel müdahale gerekli.");
 
                     _store.SetActive(previousContainer, previousVersion ?? "");
-                    await SetPhaseAsync(UpdatePhase.RolledBack, $"Rollback tamamlandı. Aktif: {previousVersion}", 100, ct);
+                    await SetPhaseAsync(UpdatePhase.RolledBack, $"Eski sürüme dönüldü: {previousVersion}", 100, ct);
                 }
                 else
                 {
-                    throw new InvalidOperationException("Canlı sürüm başarısız ve geri dönülecek eski container yok.");
+                    throw new InvalidOperationException("Yeni sürüm başarısız ve geri dönülecek container yok.");
                 }
 
                 return;
@@ -131,25 +120,37 @@ public class UpdateOrchestrator
         try
         {
             Begin(ExtractVersion(containerName), state.ActiveVersion);
-            await SetPhaseAsync(UpdatePhase.RollingBack, $"{containerName} sürümüne dönülüyor...", 20, ct);
-
+            await SetPhaseAsync(UpdatePhase.StoppingCurrent, "Mevcut sürüm durduruluyor...", 30, ct);
+            await _docker.StopContainersOnPortAsync(_options.AppHostPort, ct);
             if (!string.IsNullOrWhiteSpace(current))
                 await _docker.StopContainerAsync(current, ct);
 
+            await SetPhaseAsync(UpdatePhase.RollingBack, $"{containerName} başlatılıyor...", 60, ct);
             await _docker.StartExistingContainerAsync(containerName, ct);
 
-            await SetPhaseAsync(UpdatePhase.HealthCheckingProduction, "Rollback sağlık kontrolü...", 70, ct);
+            await SetPhaseAsync(UpdatePhase.HealthCheckingProduction, "Kontrol ediliyor...", 85, ct);
             var healthy = await WaitForHealthAsync(_options.AppHostPort, ct);
             if (!healthy)
-                throw new InvalidOperationException("Rollback sonrası sağlık kontrolü başarısız.");
+                throw new InvalidOperationException("Rollback sonrası uygulama yanıt vermiyor.");
 
             _store.SetActive(containerName, ExtractVersion(containerName));
-            await SetPhaseAsync(UpdatePhase.RolledBack, $"Rollback tamamlandı: {ExtractVersion(containerName)}", 100, ct);
+            await SetPhaseAsync(UpdatePhase.RolledBack, $"Geri dönüldü: {ExtractVersion(containerName)}", 100, ct);
         }
         finally
         {
             _gate.Release();
         }
+    }
+
+    private string ExtractVersion(string containerName)
+    {
+        var prefix = _options.ContainerNamePrefix;
+        var name = containerName;
+        if (name.StartsWith(prefix, StringComparison.OrdinalIgnoreCase))
+            name = name[prefix.Length..];
+        if (name.EndsWith("_candidate", StringComparison.OrdinalIgnoreCase))
+            name = name[..^"_candidate".Length];
+        return name;
     }
 
     private void Begin(string targetVersion, string? previousVersion)
@@ -179,6 +180,7 @@ public class UpdateOrchestrator
             if (!p.IsRunning) p.FinishedAt = DateTimeOffset.UtcNow;
         });
         await BroadcastStateAsync(ct);
+        await BroadcastLog(message);
     }
 
     private async Task BroadcastStateAsync(CancellationToken ct)
@@ -216,16 +218,5 @@ public class UpdateOrchestrator
         }
 
         return false;
-    }
-
-    private string ExtractVersion(string containerName)
-    {
-        var prefix = _options.ContainerNamePrefix;
-        var name = containerName;
-        if (name.StartsWith(prefix, StringComparison.OrdinalIgnoreCase))
-            name = name[prefix.Length..];
-        if (name.EndsWith("_candidate", StringComparison.OrdinalIgnoreCase))
-            name = name[..^"_candidate".Length];
-        return name;
     }
 }

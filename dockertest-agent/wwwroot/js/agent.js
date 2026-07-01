@@ -1,6 +1,5 @@
 const phases = [
-    'PullingImage', 'StartingCandidate', 'HealthCheckingCandidate',
-    'StoppingCurrent', 'StartingProduction', 'HealthCheckingProduction', 'Completed'
+    'StoppingCurrent', 'PullingImage', 'StartingProduction', 'HealthCheckingProduction', 'Completed'
 ];
 
 const phaseOrder = Object.fromEntries(phases.map((p, i) => [p, i]));
@@ -42,7 +41,6 @@ function applyProgress(p) {
     const failed = p.phase === 'Failed' || p.phase === 'RollingBack';
     if (p.phase === 'RolledBack') updatePhases('Completed', false);
     else if (phases.includes(p.phase)) updatePhases(p.phase, failed);
-    if (p.message) appendLog(p.message);
 }
 
 async function loadStatus() {
@@ -76,7 +74,7 @@ async function loadReleases() {
         return `
         <div class="version-row ${isCurrent ? 'current' : ''}">
             <div>
-                <strong>v${r.version}</strong>
+                <strong>v${r.version.replace(/^v/, '')}</strong>
                 <div class="text-muted small">${r.name}</div>
             </div>
             <button class="btn btn-sm ${isCurrent ? 'btn-secondary' : 'btn-accent'}"

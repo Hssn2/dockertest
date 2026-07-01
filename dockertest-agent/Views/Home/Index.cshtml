@@ -34,12 +34,10 @@
                     <p id="progress-message" class="mb-3 text-muted">Hazır</p>
 
                     <div id="phase-list">
-                        <div class="phase-step" data-phase="PullingImage"><span class="phase-dot"></span>Image indiriliyor</div>
-                        <div class="phase-step" data-phase="StartingCandidate"><span class="phase-dot"></span>Aday container başlatılıyor (8081)</div>
-                        <div class="phase-step" data-phase="HealthCheckingCandidate"><span class="phase-dot"></span>Aday sağlık kontrolü</div>
                         <div class="phase-step" data-phase="StoppingCurrent"><span class="phase-dot"></span>Mevcut sürüm durduruluyor</div>
-                        <div class="phase-step" data-phase="StartingProduction"><span class="phase-dot"></span>Port 80'de yeni sürüm başlatılıyor</div>
-                        <div class="phase-step" data-phase="HealthCheckingProduction"><span class="phase-dot"></span>Canlı sağlık kontrolü</div>
+                        <div class="phase-step" data-phase="PullingImage"><span class="phase-dot"></span>Yeni image indiriliyor</div>
+                        <div class="phase-step" data-phase="StartingProduction"><span class="phase-dot"></span>Aynı portta yeni sürüm başlatılıyor</div>
+                        <div class="phase-step" data-phase="HealthCheckingProduction"><span class="phase-dot"></span>Uygulama kontrol ediliyor</div>
                         <div class="phase-step" data-phase="Completed"><span class="phase-dot"></span>Tamamlandı</div>
                     </div>
 

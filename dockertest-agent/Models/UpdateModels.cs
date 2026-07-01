@@ -3,10 +3,8 @@ namespace dockertest_agent.Models;
 public enum UpdatePhase
 {
     Idle,
-    PullingImage,
-    StartingCandidate,
-    HealthCheckingCandidate,
     StoppingCurrent,
+    PullingImage,
     StartingProduction,
     HealthCheckingProduction,
     Completed,
