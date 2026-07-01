@@ -58,16 +58,27 @@ async function loadReleases() {
     const releases = data.items ?? data;
 
     if (!releases.length) {
-        const hint = data.hint || 'Release bulunamadı.';
-        const tokenNote = data.tokenConfigured
-            ? ''
-            : '<br><code>-e Agent__GitHubToken=ghp_xxx</code> ile agent\'ı başlat. PAT: <strong>read:packages</strong> + repo read';
+        const hint = data.hint || data.error || 'Release bulunamadı.';
+        const isRateLimit = (hint + (data.error || '')).toLowerCase().includes('rate limit');
+        const tokenNote = isRateLimit
+            ? `<br><br><strong>Çözüm:</strong> GitHub PAT oluştur ve agent'a ver:<br>
+               <code>-e Agent__GitHubToken=ghp_xxx</code><br>
+               <small>Settings → Developer settings → PAT → public_repo işaretle</small>`
+            : (data.tokenConfigured
+                ? '<br><small>Token tanımlı ama liste boş.</small>'
+                : '<br><small>İsteğe bağlı: <code>-e Agent__GitHubToken=ghp_xxx</code></small>');
         releasesList.innerHTML = `<p class="text-muted">${hint}${tokenNote}</p>`;
         return;
     }
 
-    const sourceNote = data.source === 'docker-local'
-        ? '<p class="text-muted small mb-2">Kaynak: bu makinedeki Docker image\'lar</p>'
+    const sourceLabels = {
+        'github-releases': 'GitHub Releases',
+        'github-tags': 'GitHub Tags',
+        'github-packages': 'GHCR Packages',
+        'docker-local': 'Yerel Docker image'
+    };
+    const sourceNote = data.source
+        ? `<p class="text-muted small mb-2">Kaynak: ${sourceLabels[data.source] || data.source}</p>`
         : '';
     releasesList.innerHTML = sourceNote + releases.map(r => {
         const isCurrent = r.version === activeVersion;

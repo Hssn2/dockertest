@@ -28,93 +28,71 @@ public class GitHubReleaseService
     {
         var token = _options.ResolveToken();
         var response = new ReleasesResponse { TokenConfigured = !string.IsNullOrWhiteSpace(token) };
+        string? lastError = null;
 
         var fromReleases = await TryGitHubReleasesAsync(token, ct);
-        if (fromReleases.Count > 0)
-        {
-            response.Items = fromReleases;
-            response.Source = "github-releases";
-            return response;
-        }
+        if (fromReleases.Error != null) lastError = fromReleases.Error;
+        if (fromReleases.Items.Count > 0)
+            return Finish(response, fromReleases.Items, "github-releases");
+
+        var fromTags = await TryGitHubTagsAsync(token, ct);
+        if (fromTags.Error != null) lastError = fromTags.Error;
+        if (fromTags.Items.Count > 0)
+            return Finish(response, fromTags.Items, "github-tags");
 
         if (!string.IsNullOrWhiteSpace(token))
         {
             var fromPackages = await TryGitHubPackagesAsync(token, ct);
-            if (fromPackages.Count > 0)
-            {
-                response.Items = fromPackages;
-                response.Source = "github-packages";
-                return response;
-            }
+            if (fromPackages.Error != null) lastError = fromPackages.Error;
+            if (fromPackages.Items.Count > 0)
+                return Finish(response, fromPackages.Items, "github-packages");
         }
 
         var fromDocker = await _docker.ListLocalImageTagsAsync(ct);
         if (fromDocker.Count > 0)
         {
-            response.Items = fromDocker
-                .Select(v => new ReleaseVersion
-                {
-                    Version = v,
-                    Tag = $"v{v}",
-                    Name = $"Yerel image — {v}",
-                    PublishedAt = DateTimeOffset.MinValue
-                })
-                .ToList();
-            response.Source = "docker-local";
-            if (!response.TokenConfigured)
-                response.Hint = "GitHub'dan alınamadı; bu makinedeki dockertest image'ları gösteriliyor.";
-            return response;
+            var items = fromDocker.Select(v => new ReleaseVersion
+            {
+                Version = v,
+                Tag = $"v{v}",
+                Name = $"Yerel image — {v}",
+                PublishedAt = DateTimeOffset.MinValue
+            }).ToList();
+            response.Hint = "GitHub'dan alınamadı; bu makinedeki image'lar listeleniyor.";
+            return Finish(response, items, "docker-local");
         }
 
-        response.Hint = "dockertest release bulunamadı. release branch'ine push yapıldı mı kontrol et.";
+        response.Hint = lastError != null
+            ? $"GitHub'a ulaşılamadı: {lastError}"
+            : "Release bulunamadı. Önce release branch'ine push yap.";
+        response.Error = lastError;
         return response;
     }
 
-    private HttpRequestMessage CreateRequest(HttpMethod method, string url, string? token)
+    private static ReleasesResponse Finish(ReleasesResponse response, List<ReleaseVersion> items, string source)
     {
-        var request = new HttpRequestMessage(method, url);
-        request.Headers.UserAgent.ParseAdd("dockertest-agent");
-        request.Headers.Accept.Add(new MediaTypeWithQualityHeaderValue("application/vnd.github+json"));
-        if (!string.IsNullOrWhiteSpace(token))
-            request.Headers.Authorization = new AuthenticationHeaderValue("Bearer", token);
-        return request;
+        response.Items = items;
+        response.Source = source;
+        return response;
     }
 
-    private static bool IsAppRelease(string tag, string? name)
-    {
-        if (name?.StartsWith("Agent", StringComparison.OrdinalIgnoreCase) == true)
-            return false;
-
-        var version = tag.StartsWith('v') ? tag[1..] : tag;
-        return AppVersionFilter.IsAppVersion(version);
-    }
-
-    private async Task<IReadOnlyList<ReleaseVersion>> TryGitHubReleasesAsync(string? token, CancellationToken ct)
+    private async Task<(List<ReleaseVersion> Items, string? Error)> TryGitHubReleasesAsync(string? token, CancellationToken ct)
     {
         var url = $"https://api.github.com/repos/{_options.GitHubOwner}/{_options.GitHubRepo}/releases?per_page=50";
+        var (json, error) = await GetJsonAsync(url, token, ct);
+        if (error != null) return ([], error);
+        if (json == null) return ([], "Boş yanıt");
+
         try
         {
-            using var request = CreateRequest(HttpMethod.Get, url, token);
-            using var httpResponse = await _http.SendAsync(request, ct);
-            if (!httpResponse.IsSuccessStatusCode)
-            {
-                _logger.LogWarning("GitHub releases API returned {Status}", httpResponse.StatusCode);
-                return [];
-            }
-
-            var json = await httpResponse.Content.ReadAsStringAsync(ct);
             using var doc = JsonDocument.Parse(json);
             var list = new List<ReleaseVersion>();
 
             foreach (var item in doc.RootElement.EnumerateArray())
             {
                 var tag = item.GetProperty("tag_name").GetString() ?? "";
-                var name = item.GetProperty("name").GetString();
-                if (!IsAppRelease(tag, name))
-                    continue;
-
-                var version = tag.StartsWith('v') ? tag[1..] : tag;
-                if (!AppVersionFilter.IsAppVersion(version))
+                var name = item.TryGetProperty("name", out var nameEl) ? nameEl.GetString() : null;
+                if (!TryParseAppVersion(tag, name, out var version))
                     continue;
 
                 list.Add(new ReleaseVersion
@@ -122,34 +100,67 @@ public class GitHubReleaseService
                     Tag = tag,
                     Version = version,
                     Name = name ?? tag,
-                    PublishedAt = item.GetProperty("published_at").GetDateTimeOffset(),
+                    PublishedAt = item.TryGetProperty("published_at", out var pub)
+                        ? pub.GetDateTimeOffset()
+                        : DateTimeOffset.MinValue,
                     IsPrerelease = item.TryGetProperty("prerelease", out var pre) && pre.GetBoolean()
                 });
             }
 
-            return list.OrderByDescending(r => r.PublishedAt).ToList();
+            return (list.OrderByDescending(r => r.PublishedAt).ToList(), null);
         }
         catch (Exception ex)
         {
-            _logger.LogError(ex, "GitHub releases could not be loaded");
-            return [];
+            _logger.LogError(ex, "Release JSON parse hatası");
+            return ([], ex.Message);
         }
     }
 
-    private async Task<IReadOnlyList<ReleaseVersion>> TryGitHubPackagesAsync(string token, CancellationToken ct)
+    private async Task<(List<ReleaseVersion> Items, string? Error)> TryGitHubTagsAsync(string? token, CancellationToken ct)
     {
-        var url = $"https://api.github.com/users/{_options.GitHubOwner}/packages/container/{_options.GitHubRepo}/versions?per_page=50";
+        var url = $"https://api.github.com/repos/{_options.GitHubOwner}/{_options.GitHubRepo}/tags?per_page=50";
+        var (json, error) = await GetJsonAsync(url, token, ct);
+        if (error != null) return ([], error);
+        if (json == null) return ([], "Boş yanıt");
+
         try
         {
-            using var request = CreateRequest(HttpMethod.Get, url, token);
-            using var httpResponse = await _http.SendAsync(request, ct);
-            if (!httpResponse.IsSuccessStatusCode)
+            using var doc = JsonDocument.Parse(json);
+            var list = new List<ReleaseVersion>();
+
+            foreach (var item in doc.RootElement.EnumerateArray())
             {
-                _logger.LogWarning("GitHub packages API returned {Status}", httpResponse.StatusCode);
-                return [];
+                var tag = item.GetProperty("name").GetString() ?? "";
+                if (!TryParseAppVersion(tag, null, out var version))
+                    continue;
+
+                list.Add(new ReleaseVersion
+                {
+                    Tag = tag,
+                    Version = version,
+                    Name = $"Tag — {tag}",
+                    PublishedAt = DateTimeOffset.MinValue
+                });
             }
 
-            var json = await httpResponse.Content.ReadAsStringAsync(ct);
+            return (list, null);
+        }
+        catch (Exception ex)
+        {
+            _logger.LogError(ex, "Tag JSON parse hatası");
+            return ([], ex.Message);
+        }
+    }
+
+    private async Task<(List<ReleaseVersion> Items, string? Error)> TryGitHubPackagesAsync(string token, CancellationToken ct)
+    {
+        var url = $"https://api.github.com/users/{_options.GitHubOwner}/packages/container/{_options.GitHubRepo}/versions?per_page=50";
+        var (json, error) = await GetJsonAsync(url, token, ct);
+        if (error != null) return ([], error);
+        if (json == null) return ([], "Boş yanıt");
+
+        try
+        {
             using var doc = JsonDocument.Parse(json);
             var versions = new Dictionary<string, ReleaseVersion>();
 
@@ -167,11 +178,6 @@ public class GitHubReleaseService
                 foreach (var tagEl in tags.EnumerateArray())
                 {
                     var tag = tagEl.GetString() ?? "";
-                    if (string.IsNullOrWhiteSpace(tag) || tag.Equals("latest", StringComparison.OrdinalIgnoreCase))
-                        continue;
-                    if (!IsAppRelease(tag, null))
-                        continue;
-
                     if (!AppVersionFilter.IsAppVersion(tag))
                         continue;
 
@@ -180,7 +186,7 @@ public class GitHubReleaseService
                         versions[tag] = new ReleaseVersion
                         {
                             Version = tag,
-                            Tag = tag,
+                            Tag = $"v{tag}",
                             Name = $"GHCR — {tag}",
                             PublishedAt = createdAt
                         };
@@ -188,12 +194,64 @@ public class GitHubReleaseService
                 }
             }
 
-            return versions.Values.OrderByDescending(v => v.PublishedAt).ToList();
+            return (versions.Values.OrderByDescending(v => v.PublishedAt).ToList(), null);
         }
         catch (Exception ex)
         {
-            _logger.LogError(ex, "GitHub packages could not be loaded");
-            return [];
+            _logger.LogError(ex, "Package JSON parse hatası");
+            return ([], ex.Message);
         }
+    }
+
+    private async Task<(string? Json, string? Error)> GetJsonAsync(string url, string? token, CancellationToken ct)
+    {
+        try
+        {
+            using var request = new HttpRequestMessage(HttpMethod.Get, url);
+            if (!string.IsNullOrWhiteSpace(token))
+                request.Headers.Authorization = new AuthenticationHeaderValue("Bearer", token);
+
+            using var httpResponse = await _http.SendAsync(request, ct);
+            var body = await httpResponse.Content.ReadAsStringAsync(ct);
+
+            if (!httpResponse.IsSuccessStatusCode)
+            {
+                _logger.LogWarning("GitHub API {Url} → {Status}: {Body}", url, httpResponse.StatusCode, body);
+                if (body.Contains("rate limit", StringComparison.OrdinalIgnoreCase))
+                    return (null, "GitHub rate limit aşıldı. Agent__GitHubToken ile PAT ekle.");
+                return (null, $"{(int)httpResponse.StatusCode} — {TryReadGitHubMessage(body)}");
+            }
+
+            return (body, null);
+        }
+        catch (Exception ex)
+        {
+            _logger.LogError(ex, "GitHub API isteği başarısız: {Url}", url);
+            return (null, ex.Message);
+        }
+    }
+
+    private static string TryReadGitHubMessage(string body)
+    {
+        try
+        {
+            using var doc = JsonDocument.Parse(body);
+            if (doc.RootElement.TryGetProperty("message", out var msg))
+                return msg.GetString() ?? "API hatası";
+        }
+        catch { }
+        return "API hatası";
+    }
+
+    private static bool TryParseAppVersion(string tag, string? releaseName, out string version)
+    {
+        version = "";
+        if (releaseName?.StartsWith("Agent", StringComparison.OrdinalIgnoreCase) == true)
+            return false;
+        if (tag.StartsWith("agent-", StringComparison.OrdinalIgnoreCase))
+            return false;
+
+        version = tag.StartsWith('v') ? tag[1..] : tag;
+        return AppVersionFilter.IsAppVersion(version);
     }
 }

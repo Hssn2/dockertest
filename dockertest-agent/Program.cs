@@ -1,3 +1,4 @@
+using System.Net.Http.Headers;
 using dockertest_agent.Hubs;
 using dockertest_agent.Models;
 using dockertest_agent.Services;
@@ -8,7 +9,12 @@ builder.Services.Configure<AgentOptions>(builder.Configuration.GetSection(AgentO
 builder.Services.AddSingleton<UpdateStateStore>();
 builder.Services.AddSingleton<DockerService>();
 builder.Services.AddSingleton<UpdateOrchestrator>();
-builder.Services.AddHttpClient<GitHubReleaseService>();
+builder.Services.AddHttpClient<GitHubReleaseService>(client =>
+{
+    client.DefaultRequestHeaders.UserAgent.ParseAdd("dockertest-agent");
+    client.DefaultRequestHeaders.Accept.Add(new MediaTypeWithQualityHeaderValue("application/vnd.github+json"));
+    client.Timeout = TimeSpan.FromSeconds(30);
+});
 builder.Services.AddHttpClient();
 builder.Services.AddSignalR();
 builder.Services.AddControllersWithViews();

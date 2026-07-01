@@ -50,6 +50,7 @@ public class ReleasesResponse
     public IReadOnlyList<ReleaseVersion> Items { get; set; } = [];
     public string Source { get; set; } = "";
     public string? Hint { get; set; }
+    public string? Error { get; set; }
     public bool TokenConfigured { get; set; }
 }
 
