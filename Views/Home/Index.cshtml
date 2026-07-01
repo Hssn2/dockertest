@@ -2,11 +2,44 @@
     ViewData["Title"] = "Ana Sayfa";
 }
 
-<div class="text-center">
-    <h1 class="display-5">Merhaba, Özgür Akdeniz</h1>
-    <p class="lead text-muted">ASP.NET Core MVC + Docker release pipeline deneme uygulaması</p>
-    <span class="badge bg-primary">v@(ViewBag.AppVersion)</span>
-    <p class="mt-4">
-        <code>release</code> branch'ine commit atınca GitHub Actions otomatik Docker image üretir.
-    </p>
+<div class="page-hero text-center">
+    <h1 class="display-5 fw-bold">Merhaba, ben Hasan Günay</h1>
+    <p class="lead text-muted">ASP.NET Core MVC + Docker release pipeline demo uygulaması</p>
+    <span class="badge badge-version rounded-pill">v@(ViewBag.AppVersion)</span>
 </div>
+
+<div class="row g-4 mt-2 justify-content-center">
+    <div class="col-lg-5">
+        <div class="card-dark p-4 h-100">
+            <h2 class="h4 mb-3">XOX Oyunu</h2>
+            <p class="text-muted small mb-3">İki kişilik klasik taş-kağıt-makas değil, XOX. Sırayla oyna.</p>
+            <p id="xox-status" class="xox-status text-center mb-3">Sıra: X</p>
+            <div id="xox-board" class="xox-board mb-3">
+                @for (var i = 0; i < 9; i++)
+                {
+                    <button type="button" class="xox-cell" data-index="@i" aria-label="Hücre @(i + 1)"></button>
+                }
+            </div>
+            <div class="text-center">
+                <button type="button" id="xox-reset" class="btn btn-outline-accent btn-sm">Yeniden Başla</button>
+            </div>
+        </div>
+    </div>
+    <div class="col-lg-5">
+        <div class="card-dark p-4 h-100">
+            <h2 class="h4 mb-3">Hızlı Bilgi</h2>
+            <ul class="list-unstyled text-muted mb-4">
+                <li class="mb-2">.NET 8 MVC web uygulaması</li>
+                <li class="mb-2">GitHub Actions ile otomatik release</li>
+                <li class="mb-2">Docker image olarak paketleniyor</li>
+                <li><code class="text-info">release</code> branch'ine push = yeni versiyon</li>
+            </ul>
+            <a asp-controller="Home" asp-action="Hakkimda" class="btn btn-accent me-2">Hakkımda</a>
+            <a asp-controller="Home" asp-action="Projeler" class="btn btn-outline-accent">Projeler</a>
+        </div>
+    </div>
+</div>
+
+@section Scripts {
+    <script src="~/js/xox.js" asp-append-version="true"></script>
+}

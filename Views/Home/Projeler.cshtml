@@ -1,0 +1,33 @@
+@{
+    ViewData["Title"] = "Projeler";
+}
+
+<div class="page-hero">
+    <h1 class="display-6 fw-bold">Projeler</h1>
+    <p class="text-muted">Üzerinde çalıştığım demo ve gerçek projeler</p>
+</div>
+
+<div class="row g-4">
+    <div class="col-md-6">
+        <div class="card-dark p-4 h-100">
+            <h2 class="h5 text-info">dockertest</h2>
+            <p class="text-muted small mb-2">ASP.NET Core MVC · Docker · GitHub Actions</p>
+            <p>
+                Bu uygulama. Otomatik semver, GHCR image push ve GitHub Release
+                pipeline'ını içerir. Müşterilere <code>docker pull</code> ile dağıtılabilir.
+            </p>
+            <span class="skill-tag">Aktif</span>
+        </div>
+    </div>
+    <div class="col-md-6">
+        <div class="card-dark p-4 h-100">
+            <h2 class="h5 text-info">CI/CD Pipeline</h2>
+            <p class="text-muted small mb-2">GitHub Actions · GHCR</p>
+            <p>
+                Commit mesajına göre major / minor / patch versiyon artışı.
+                Her release'de Docker image ve GitHub Release otomatik oluşur.
+            </p>
+            <span class="skill-tag">DevOps</span>
+        </div>
+    </div>
+</div>
