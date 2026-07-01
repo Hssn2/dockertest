@@ -79,3 +79,32 @@ body {
   font-weight: 600;
   color: var(--muted);
 }
+
+.snake-page {
+  padding-top: 2rem;
+}
+
+.snake-canvas {
+  display: block;
+  margin: 0 auto;
+  border: 2px solid #2e3345;
+  border-radius: 8px;
+  outline: none;
+  box-shadow: 0 0 0 2px transparent;
+}
+
+.snake-canvas:focus {
+  border-color: var(--accent);
+  box-shadow: 0 0 0 2px rgba(108, 140, 255, 0.35);
+}
+
+.snake-score {
+  font-size: 1.1rem;
+  font-weight: 600;
+  color: var(--accent);
+}
+
+.snake-status {
+  color: var(--muted);
+  min-height: 1.5rem;
+}

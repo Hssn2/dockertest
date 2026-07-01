@@ -27,6 +27,8 @@ namespace dockertest.Controllers
 
         public IActionResult Xox() => View();
 
+        public IActionResult Snake() => View();
+
         [ResponseCache(Duration = 0, Location = ResponseCacheLocation.None, NoStore = true)]
         public IActionResult Error()
         {
