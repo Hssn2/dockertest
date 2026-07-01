@@ -198,7 +198,8 @@ public class UpdateOrchestrator
     {
         var client = _httpClientFactory.CreateClient();
         client.Timeout = TimeSpan.FromSeconds(5);
-        var url = $"http://localhost:{hostPort}{_options.HealthPath}";
+        var host = _options.ResolveHealthCheckHost();
+        var url = $"http://{host}:{hostPort}{_options.HealthPath}";
 
         for (var i = 0; i < _options.HealthCheckRetries; i++)
         {

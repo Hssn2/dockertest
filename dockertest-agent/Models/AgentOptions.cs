@@ -12,6 +12,7 @@ public class AgentOptions
     public string GitHubRepo { get; set; } = "dockertest";
     public string GitHubToken { get; set; } = "";
     public string HealthPath { get; set; } = "/health";
+    public string HealthCheckHost { get; set; } = "";
     public int HealthCheckRetries { get; set; } = 15;
     public int HealthCheckIntervalSeconds { get; set; } = 2;
     public string StateDirectory { get; set; } = "";
@@ -20,4 +21,11 @@ public class AgentOptions
         !string.IsNullOrWhiteSpace(GitHubToken)
             ? GitHubToken
             : Environment.GetEnvironmentVariable("GITHUB_TOKEN") ?? "";
+
+    public string ResolveHealthCheckHost()
+    {
+        if (!string.IsNullOrWhiteSpace(HealthCheckHost))
+            return HealthCheckHost;
+        return File.Exists("/.dockerenv") ? "host.docker.internal" : "localhost";
+    }
 }

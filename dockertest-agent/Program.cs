@@ -29,15 +29,23 @@ app.Run();
 
 static async Task DiscoverActiveContainerAsync(WebApplication app)
 {
-    using var scope = app.Services.CreateScope();
-    var docker = scope.ServiceProvider.GetRequiredService<DockerService>();
-    var store = scope.ServiceProvider.GetRequiredService<UpdateStateStore>();
-    var options = scope.ServiceProvider.GetRequiredService<Microsoft.Extensions.Options.IOptions<AgentOptions>>().Value;
+    try
+    {
+        using var scope = app.Services.CreateScope();
+        var docker = scope.ServiceProvider.GetRequiredService<DockerService>();
+        var store = scope.ServiceProvider.GetRequiredService<UpdateStateStore>();
+        var options = scope.ServiceProvider.GetRequiredService<Microsoft.Extensions.Options.IOptions<AgentOptions>>().Value;
 
-    var containers = await docker.ListManagedContainersAsync(null, CancellationToken.None);
-    var active = containers.FirstOrDefault(c =>
-        c.State == "running" && c.HostPort == options.AppHostPort);
+        var containers = await docker.ListManagedContainersAsync(null, CancellationToken.None);
+        var active = containers.FirstOrDefault(c =>
+            c.State == "running" && c.HostPort == options.AppHostPort);
 
-    if (active != null)
-        store.SetActive(active.Name, active.Version);
+        if (active != null)
+            store.SetActive(active.Name, active.Version);
+    }
+    catch (Exception ex)
+    {
+        var logger = app.Services.GetRequiredService<ILogger<Program>>();
+        logger.LogWarning(ex, "Docker'a bağlanılamadı. Socket mount kontrol et: /var/run/docker.sock");
+    }
 }
