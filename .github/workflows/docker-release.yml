@@ -5,9 +5,18 @@ on:
     branches:
       - release
     paths:
-      - '**'
-      - '!dockertest-agent/**'
-      - '!.github/workflows/docker-agent-release.yml'
+      - 'Controllers/**'
+      - 'Views/**'
+      - 'wwwroot/**'
+      - 'Models/**'
+      - 'Properties/**'
+      - 'Program.cs'
+      - 'dockertest.csproj'
+      - 'Dockerfile'
+      - '.dockerignore'
+      - 'appsettings.json'
+      - 'appsettings.*.json'
+      - '.github/workflows/docker-release.yml'
 
 permissions:
   contents: write

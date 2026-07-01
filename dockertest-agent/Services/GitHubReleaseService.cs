@@ -29,16 +29,16 @@ public class GitHubReleaseService
         var token = _options.ResolveToken();
         var response = new ReleasesResponse { TokenConfigured = !string.IsNullOrWhiteSpace(token) };
 
+        var fromReleases = await TryGitHubReleasesAsync(token, ct);
+        if (fromReleases.Count > 0)
+        {
+            response.Items = fromReleases;
+            response.Source = "github-releases";
+            return response;
+        }
+
         if (!string.IsNullOrWhiteSpace(token))
         {
-            var fromReleases = await TryGitHubReleasesAsync(token, ct);
-            if (fromReleases.Count > 0)
-            {
-                response.Items = fromReleases;
-                response.Source = "github-releases";
-                return response;
-            }
-
             var fromPackages = await TryGitHubPackagesAsync(token, ct);
             if (fromPackages.Count > 0)
             {
@@ -62,26 +62,34 @@ public class GitHubReleaseService
                 .ToList();
             response.Source = "docker-local";
             if (!response.TokenConfigured)
-                response.Hint = "GitHub token yok; sadece bu makinede indirilmiş image'lar gösteriliyor.";
+                response.Hint = "GitHub'dan alınamadı; bu makinedeki dockertest image'ları gösteriliyor.";
             return response;
         }
 
-        response.Hint = response.TokenConfigured
-            ? "Release veya package bulunamadı. release branch'ine push yapıldı mı kontrol et."
-            : "Private repo için GitHub PAT gerekli. Agent'ı Agent__GitHubToken ile başlat.";
+        response.Hint = "dockertest release bulunamadı. release branch'ine push yapıldı mı kontrol et.";
         return response;
     }
 
-    private HttpRequestMessage CreateRequest(HttpMethod method, string url, string token)
+    private HttpRequestMessage CreateRequest(HttpMethod method, string url, string? token)
     {
         var request = new HttpRequestMessage(method, url);
         request.Headers.UserAgent.ParseAdd("dockertest-agent");
         request.Headers.Accept.Add(new MediaTypeWithQualityHeaderValue("application/vnd.github+json"));
-        request.Headers.Authorization = new AuthenticationHeaderValue("Bearer", token);
+        if (!string.IsNullOrWhiteSpace(token))
+            request.Headers.Authorization = new AuthenticationHeaderValue("Bearer", token);
         return request;
     }
 
-    private async Task<IReadOnlyList<ReleaseVersion>> TryGitHubReleasesAsync(string token, CancellationToken ct)
+    private static bool IsAppRelease(string tag, string? name)
+    {
+        if (tag.StartsWith("agent-", StringComparison.OrdinalIgnoreCase))
+            return false;
+        if (name?.StartsWith("Agent", StringComparison.OrdinalIgnoreCase) == true)
+            return false;
+        return true;
+    }
+
+    private async Task<IReadOnlyList<ReleaseVersion>> TryGitHubReleasesAsync(string? token, CancellationToken ct)
     {
         var url = $"https://api.github.com/repos/{_options.GitHubOwner}/{_options.GitHubRepo}/releases?per_page=50";
         try
@@ -101,7 +109,8 @@ public class GitHubReleaseService
             foreach (var item in doc.RootElement.EnumerateArray())
             {
                 var tag = item.GetProperty("tag_name").GetString() ?? "";
-                if (tag.StartsWith("agent-", StringComparison.OrdinalIgnoreCase))
+                var name = item.GetProperty("name").GetString();
+                if (!IsAppRelease(tag, name))
                     continue;
 
                 var version = tag.StartsWith('v') ? tag[1..] : tag;
@@ -109,7 +118,7 @@ public class GitHubReleaseService
                 {
                     Tag = tag,
                     Version = version,
-                    Name = item.GetProperty("name").GetString() ?? tag,
+                    Name = name ?? tag,
                     PublishedAt = item.GetProperty("published_at").GetDateTimeOffset(),
                     IsPrerelease = item.TryGetProperty("prerelease", out var pre) && pre.GetBoolean()
                 });
@@ -156,6 +165,8 @@ public class GitHubReleaseService
                 {
                     var tag = tagEl.GetString() ?? "";
                     if (string.IsNullOrWhiteSpace(tag) || tag.Equals("latest", StringComparison.OrdinalIgnoreCase))
+                        continue;
+                    if (!IsAppRelease(tag, null))
                         continue;
 
                     if (!versions.ContainsKey(tag))
