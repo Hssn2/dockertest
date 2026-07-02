@@ -33,8 +33,8 @@ public class ReleaseService
                     _downloadUrls[item.Version] = item.DownloadUrl;
             }
 
-            if (catalog.Items.Count > 0)
-                return catalog;
+            // CatalogUrl tanımlıysa GitHub'a düşme — boş olsa bile katalog kaynağını göster
+            return catalog;
         }
 
         return await _github.GetCatalogAsync(ct);
