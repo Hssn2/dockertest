@@ -12,6 +12,7 @@ public class UpdateOrchestrator
     private readonly AgentOptions _options;
     private readonly IHubContext<UpdateHub> _hub;
     private readonly IHttpClientFactory _httpClientFactory;
+    private readonly ReleaseService _releases;
     private readonly ILogger<UpdateOrchestrator> _logger;
     private readonly SemaphoreSlim _gate = new(1, 1);
 
@@ -20,6 +21,7 @@ public class UpdateOrchestrator
         UpdateStateStore store,
         IOptions<AgentOptions> options,
         IHubContext<UpdateHub> hub,
+        ReleaseService releases,
         IHttpClientFactory httpClientFactory,
         ILogger<UpdateOrchestrator> logger)
     {
@@ -27,6 +29,7 @@ public class UpdateOrchestrator
         _store = store;
         _options = options.Value;
         _hub = hub;
+        _releases = releases;
         _httpClientFactory = httpClientFactory;
         _logger = logger;
     }
@@ -54,7 +57,11 @@ public class UpdateOrchestrator
 
             await SetPhaseAsync(UpdatePhase.PullingImage, "Yeni image indiriliyor...", 45, ct);
             var pullProgress = new Progress<string>(msg => _ = BroadcastLog(msg));
-            await _docker.PullImageAsync(version, pullProgress, ct);
+            var downloadUrl = await _releases.ResolveDownloadUrlAsync(version, ct);
+            if (!string.IsNullOrWhiteSpace(downloadUrl))
+                await _docker.LoadImageFromArchiveUrlAsync(downloadUrl, pullProgress, ct);
+            else
+                await _docker.PullImageAsync(version, pullProgress, ct);
 
             await SetPhaseAsync(UpdatePhase.StartingProduction, $"Port {_options.AppHostPort} üzerinde yeni sürüm başlatılıyor...", 70, ct);
             await _docker.RemoveContainerAsync(prodName, ct);

@@ -33,6 +33,7 @@ public class ReleaseVersion
     public string Name { get; set; } = "";
     public DateTimeOffset PublishedAt { get; set; }
     public bool IsPrerelease { get; set; }
+    public string? DownloadUrl { get; set; }
 }
 
 public class ManagedContainer

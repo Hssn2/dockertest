@@ -9,11 +9,21 @@ builder.Services.Configure<AgentOptions>(builder.Configuration.GetSection(AgentO
 builder.Services.AddSingleton<UpdateStateStore>();
 builder.Services.AddSingleton<DockerService>();
 builder.Services.AddSingleton<UpdateOrchestrator>();
+builder.Services.AddSingleton<ReleaseService>();
+builder.Services.AddHttpClient<CatalogReleaseService>(client =>
+{
+    client.DefaultRequestHeaders.UserAgent.ParseAdd("dockertest-agent");
+    client.Timeout = TimeSpan.FromSeconds(60);
+});
 builder.Services.AddHttpClient<GitHubReleaseService>(client =>
 {
     client.DefaultRequestHeaders.UserAgent.ParseAdd("dockertest-agent");
     client.DefaultRequestHeaders.Accept.Add(new MediaTypeWithQualityHeaderValue("application/vnd.github+json"));
     client.Timeout = TimeSpan.FromSeconds(30);
+});
+builder.Services.AddHttpClient("image-download", client =>
+{
+    client.Timeout = TimeSpan.FromHours(2);
 });
 builder.Services.AddHttpClient();
 builder.Services.AddSignalR();

@@ -17,6 +17,12 @@ public class AgentOptions
     public int HealthCheckIntervalSeconds { get; set; } = 2;
     public string StateDirectory { get; set; } = "";
 
+    /// <summary>
+    /// Release kataloğu taban URL (ör. http://localhost:8090 veya http://host.docker.internal:8090).
+    /// Doluysa önce buradan .tar.gz manifest okunur.
+    /// </summary>
+    public string CatalogUrl { get; set; } = "";
+
     public string ResolveToken() =>
         !string.IsNullOrWhiteSpace(GitHubToken)
             ? GitHubToken

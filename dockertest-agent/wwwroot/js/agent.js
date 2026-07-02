@@ -72,6 +72,7 @@ async function loadReleases() {
     }
 
     const sourceLabels = {
+        'catalog': 'Release Kataloğu (.tar.gz)',
         'github-releases': 'GitHub Releases',
         'github-tags': 'GitHub Tags',
         'github-packages': 'GHCR Packages',

@@ -1,3 +1,4 @@
+using System.IO.Compression;
 using System.Runtime.InteropServices;
 using System.Text.Json;
 using Docker.DotNet;
@@ -11,11 +12,16 @@ public class DockerService
 {
     private readonly DockerClient _client;
     private readonly AgentOptions _options;
+    private readonly IHttpClientFactory _httpClientFactory;
     private readonly ILogger<DockerService> _logger;
 
-    public DockerService(IOptions<AgentOptions> options, ILogger<DockerService> logger)
+    public DockerService(
+        IOptions<AgentOptions> options,
+        IHttpClientFactory httpClientFactory,
+        ILogger<DockerService> logger)
     {
         _options = options.Value;
+        _httpClientFactory = httpClientFactory;
         _logger = logger;
         var uri = File.Exists("/var/run/docker.sock")
             ? new Uri("unix:///var/run/docker.sock")
@@ -65,6 +71,63 @@ public class DockerService
                     progress?.Report(msg.Status);
             }),
             ct);
+    }
+
+    public async Task LoadImageFromArchiveUrlAsync(string downloadUrl, IProgress<string>? progress, CancellationToken ct)
+    {
+        progress?.Report($"Arşiv indiriliyor: {downloadUrl}");
+
+        var tempDir = Path.Combine(Path.GetTempPath(), "dockertest-agent");
+        Directory.CreateDirectory(tempDir);
+
+        var fileName = Path.GetFileName(new Uri(downloadUrl).LocalPath);
+        if (string.IsNullOrWhiteSpace(fileName))
+            fileName = $"image-{Guid.NewGuid():N}.tar.gz";
+
+        var tempPath = Path.Combine(tempDir, fileName);
+
+        try
+        {
+            var http = _httpClientFactory.CreateClient("image-download");
+            using var response = await http.GetAsync(downloadUrl, HttpCompletionOption.ResponseHeadersRead, ct);
+            response.EnsureSuccessStatusCode();
+
+            var total = response.Content.Headers.ContentLength;
+            await using (var netStream = await response.Content.ReadAsStreamAsync(ct))
+            await using (var file = File.Create(tempPath))
+            {
+                var buffer = new byte[81920];
+                long read = 0;
+                int bytes;
+                while ((bytes = await netStream.ReadAsync(buffer, ct)) > 0)
+                {
+                    await file.WriteAsync(buffer.AsMemory(0, bytes), ct);
+                    read += bytes;
+                    if (total > 0)
+                        progress?.Report($"İndiriliyor... %{read * 100 / total}");
+                    else if (read % (10 * 1024 * 1024) < buffer.Length)
+                        progress?.Report($"İndiriliyor... {read / (1024 * 1024)} MB");
+                }
+            }
+
+            progress?.Report("Docker'a yükleniyor...");
+            await using var loadStream = OpenImageLoadStream(tempPath);
+            await _client.Images.LoadImageAsync(
+                new ImageLoadParameters(),
+                loadStream,
+                new Progress<JSONMessage>(msg =>
+                {
+                    if (!string.IsNullOrWhiteSpace(msg.Status))
+                        progress?.Report(msg.Status);
+                }),
+                ct);
+            progress?.Report("Image yüklendi.");
+            _logger.LogInformation("Loaded image from archive {Url}", downloadUrl);
+        }
+        finally
+        {
+            TryDeleteFile(tempPath);
+        }
     }
 
     public async Task<string> RunContainerAsync(string name, int hostPort, string version, CancellationToken ct)
@@ -193,5 +256,28 @@ public class DockerService
         if (name.EndsWith("_candidate", StringComparison.OrdinalIgnoreCase))
             name = name[..^"_candidate".Length];
         return name;
+    }
+
+    private static Stream OpenImageLoadStream(string path)
+    {
+        var file = File.OpenRead(path);
+        if (path.EndsWith(".gz", StringComparison.OrdinalIgnoreCase) ||
+            path.EndsWith(".tgz", StringComparison.OrdinalIgnoreCase))
+            return new GZipStream(file, CompressionMode.Decompress, leaveOpen: false);
+
+        return file;
+    }
+
+    private static void TryDeleteFile(string path)
+    {
+        try
+        {
+            if (File.Exists(path))
+                File.Delete(path);
+        }
+        catch
+        {
+            // temp dosya kalırsa sorun değil
+        }
     }
 }

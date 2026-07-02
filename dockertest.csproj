@@ -18,6 +18,10 @@
     <Content Remove="dockertest-agent/**" />
     <EmbeddedResource Remove="dockertest-agent/**" />
     <None Remove="dockertest-agent/**" />
+    <Compile Remove="dockertest-catalog/**" />
+    <Content Remove="dockertest-catalog/**" />
+    <EmbeddedResource Remove="dockertest-catalog/**" />
+    <None Remove="dockertest-catalog/**" />
   </ItemGroup>
 
 </Project>
