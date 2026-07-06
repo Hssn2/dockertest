@@ -133,22 +133,36 @@ public class DockerService
     public async Task<string> RunContainerAsync(string name, int hostPort, string version, CancellationToken ct)
     {
         var image = $"{_options.ImageName}:{version}";
+        var env = new List<string> { $"APP_VERSION={version}" };
+
+        if (_options.AppDatabaseEnabled)
+        {
+            env.Add("Database__Enabled=true");
+            env.Add($"Database__ConnectionString={_options.ResolveAppDatabaseConnectionString()}");
+            env.Add("Database__AutoCreateDatabase=true");
+        }
+
+        var hostConfig = new HostConfig
+        {
+            PortBindings = new Dictionary<string, IList<PortBinding>>
+            {
+                [$"{_options.AppContainerPort}/tcp"] = new List<PortBinding>
+                {
+                    new() { HostPort = hostPort.ToString() }
+                }
+            },
+            RestartPolicy = new RestartPolicy { Name = RestartPolicyKind.UnlessStopped }
+        };
+
+        if (string.Equals(_options.AppDatabaseHost, "host.docker.internal", StringComparison.OrdinalIgnoreCase))
+            hostConfig.ExtraHosts = new List<string> { "host.docker.internal:host-gateway" };
+
         var parameters = new CreateContainerParameters
         {
             Image = image,
             Name = name,
-            Env = new List<string> { $"APP_VERSION={version}" },
-            HostConfig = new HostConfig
-            {
-                PortBindings = new Dictionary<string, IList<PortBinding>>
-                {
-                    [$"{_options.AppContainerPort}/tcp"] = new List<PortBinding>
-                    {
-                        new() { HostPort = hostPort.ToString() }
-                    }
-                },
-                RestartPolicy = new RestartPolicy { Name = RestartPolicyKind.UnlessStopped }
-            },
+            Env = env,
+            HostConfig = hostConfig,
             ExposedPorts = new Dictionary<string, EmptyStruct>
             {
                 [$"{_options.AppContainerPort}/tcp"] = default

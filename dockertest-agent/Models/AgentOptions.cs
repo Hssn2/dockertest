@@ -23,6 +23,31 @@ public class AgentOptions
     /// </summary>
     public string CatalogUrl { get; set; } = "";
 
+    /// <summary>Canlı app container'a Database__Enabled geçirilir.</summary>
+    public bool AppDatabaseEnabled { get; set; } = true;
+
+    /// <summary>Doluysa AppDatabaseHost/Port/... yerine doğrudan kullanılır.</summary>
+    public string AppDatabaseConnectionString { get; set; } = "";
+
+    /// <summary>Postgres host (Docker'da genelde host.docker.internal).</summary>
+    public string AppDatabaseHost { get; set; } = "host.docker.internal";
+
+    public int AppDatabasePort { get; set; } = 5432;
+
+    public string AppDatabaseName { get; set; } = "dockertest";
+
+    public string AppDatabaseUsername { get; set; } = "sa";
+
+    public string AppDatabasePassword { get; set; } = "sa123";
+
+    public string ResolveAppDatabaseConnectionString()
+    {
+        if (!string.IsNullOrWhiteSpace(AppDatabaseConnectionString))
+            return AppDatabaseConnectionString.Trim();
+
+        return $"Host={AppDatabaseHost};Port={AppDatabasePort};Database={AppDatabaseName};Username={AppDatabaseUsername};Password={AppDatabasePassword}";
+    }
+
     public string ResolveToken() =>
         !string.IsNullOrWhiteSpace(GitHubToken)
             ? GitHubToken

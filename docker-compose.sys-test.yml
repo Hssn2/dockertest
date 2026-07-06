@@ -1,0 +1,37 @@
+# PostgreSQL + dockertest (SYS script test)
+# Kullanım: docker compose -f docker-compose.sys-test.yml up -d
+
+services:
+  postgres:
+    image: postgres:16-alpine
+    container_name: dockertest-postgres
+    environment:
+      POSTGRES_USER: postgres
+      POSTGRES_PASSWORD: postgres
+      POSTGRES_DB: dockertest
+    ports:
+      - "5432:5432"
+    volumes:
+      - dockertest-pgdata:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U postgres -d dockertest"]
+      interval: 5s
+      timeout: 5s
+      retries: 5
+
+  app:
+    build:
+      context: .
+    container_name: dockertest-app
+    ports:
+      - "5080:8080"
+    environment:
+      ASPNETCORE_ENVIRONMENT: Development
+      Database__Enabled: "true"
+      Database__ConnectionString: "Host=postgres;Port=5432;Database=dockertest;Username=postgres;Password=postgres"
+    depends_on:
+      postgres:
+        condition: service_healthy
+
+volumes:
+  dockertest-pgdata:

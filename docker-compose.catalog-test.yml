@@ -19,6 +19,12 @@ services:
       ASPNETCORE_URLS: "http://+:8080"
       Agent__CatalogUrl: "http://catalog:8090"
       Agent__AppHostPort: "80"
+      Agent__AppDatabaseEnabled: "true"
+      Agent__AppDatabaseHost: "host.docker.internal"
+      Agent__AppDatabasePort: "5432"
+      Agent__AppDatabaseName: "dockertest"
+      Agent__AppDatabaseUsername: "sa"
+      Agent__AppDatabasePassword: "sa123"
     volumes:
       - /var/run/docker.sock:/var/run/docker.sock
     extra_hosts:
