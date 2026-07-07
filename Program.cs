@@ -1,9 +1,32 @@
+using dockertest.Data;
+using Microsoft.EntityFrameworkCore;
+
 var builder = WebApplication.CreateBuilder(args);
+
+builder.Services.Configure<DatabaseOptions>(
+    builder.Configuration.GetSection(DatabaseOptions.SectionName));
+
+var databaseOptions = builder.Configuration
+    .GetSection(DatabaseOptions.SectionName)
+    .Get<DatabaseOptions>();
+
+if (!string.IsNullOrWhiteSpace(databaseOptions?.ConnectionString))
+{
+    builder.Services.AddDbContext<AppDbContext>(options =>
+        options.UseNpgsql(databaseOptions.ConnectionString));
+}
 
 // Add services to the container.
 builder.Services.AddControllersWithViews();
 
 var app = builder.Build();
+
+if (databaseOptions?.AutoMigrate == true)
+{
+    using var scope = app.Services.CreateScope();
+    var dbContext = scope.ServiceProvider.GetRequiredService<AppDbContext>();
+    dbContext.Database.Migrate();
+}
 
 // Configure the HTTP request pipeline.
 if (!app.Environment.IsDevelopment())
