@@ -137,7 +137,7 @@ public class DockerService
         {
             Image = image,
             Name = name,
-            Env = new List<string> { $"APP_VERSION={version}" },
+            Env = BuildContainerEnv(version),
             HostConfig = new HostConfig
             {
                 PortBindings = new Dictionary<string, IList<PortBinding>>
@@ -147,7 +147,10 @@ public class DockerService
                         new() { HostPort = hostPort.ToString() }
                     }
                 },
-                RestartPolicy = new RestartPolicy { Name = RestartPolicyKind.UnlessStopped }
+                RestartPolicy = new RestartPolicy { Name = RestartPolicyKind.UnlessStopped },
+                ExtraHosts = NeedsHostGateway()
+                    ? new List<string> { "host.docker.internal:host-gateway" }
+                    : null
             },
             ExposedPorts = new Dictionary<string, EmptyStruct>
             {
@@ -159,6 +162,24 @@ public class DockerService
         await _client.Containers.StartContainerAsync(response.ID, new ContainerStartParameters(), ct);
         _logger.LogInformation("Container {Name} started on port {Port}", name, hostPort);
         return response.ID;
+    }
+
+    private List<string> BuildContainerEnv(string version)
+    {
+        var env = new List<string> { $"APP_VERSION={version}" };
+
+        if (!string.IsNullOrWhiteSpace(_options.AppDatabaseConnectionString))
+            env.Add($"Database__ConnectionString={_options.AppDatabaseConnectionString}");
+
+        env.Add($"Database__AutoMigrate={_options.AppDatabaseAutoMigrate.ToString().ToLowerInvariant()}");
+
+        return env;
+    }
+
+    private bool NeedsHostGateway()
+    {
+        var connectionString = _options.AppDatabaseConnectionString;
+        return connectionString.Contains("host.docker.internal", StringComparison.OrdinalIgnoreCase);
     }
 
     public async Task StopContainerAsync(string name, CancellationToken ct)

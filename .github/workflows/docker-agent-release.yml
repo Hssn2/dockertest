@@ -46,3 +46,16 @@ jobs:
         with:
           tag_name: agent-v${{ steps.v.outputs.n }}
           name: Agent v${{ steps.v.outputs.n }}
+          body: |
+            ## Docker
+
+            ```bash
+            docker pull ${{ steps.image.outputs.name }}:${{ steps.v.outputs.n }}
+            docker run -d -p 8080:8080 \
+              -v /var/run/docker.sock:/var/run/docker.sock \
+              -e Agent__AppDatabaseConnectionString="Host=host.docker.internal;Port=5432;Database=dockertest;Username=sa;Password=sa123" \
+              -e Agent__AppDatabaseAutoMigrate=true \
+              ${{ steps.image.outputs.name }}:${{ steps.v.outputs.n }}
+            ```
+
+            Linux'ta Docker socket yolu farklı olabilir. Windows Docker Desktop'ta genelde `/var/run/docker.sock` mount edilir.

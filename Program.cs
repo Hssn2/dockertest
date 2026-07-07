@@ -24,8 +24,20 @@ var app = builder.Build();
 if (databaseOptions?.AutoMigrate == true)
 {
     using var scope = app.Services.CreateScope();
-    var dbContext = scope.ServiceProvider.GetRequiredService<AppDbContext>();
-    dbContext.Database.Migrate();
+    var logger = scope.ServiceProvider.GetRequiredService<ILoggerFactory>().CreateLogger("Database");
+
+    try
+    {
+        var dbContext = scope.ServiceProvider.GetRequiredService<AppDbContext>();
+        logger.LogInformation("Applying database migrations...");
+        dbContext.Database.Migrate();
+        logger.LogInformation("Database migrations applied.");
+    }
+    catch (Exception ex)
+    {
+        logger.LogCritical(ex, "Database migration failed. Check ConnectionString and PostgreSQL reachability.");
+        throw;
+    }
 }
 
 // Configure the HTTP request pipeline.

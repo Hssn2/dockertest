@@ -23,6 +23,17 @@ public class AgentOptions
     /// </summary>
     public string CatalogUrl { get; set; } = "";
 
+    /// <summary>
+    /// Agent'ın başlattığı dockertest container'larına verilecek PostgreSQL bağlantısı.
+    /// Docker'dan host PostgreSQL'e erişim için Host=host.docker.internal kullan.
+    /// </summary>
+    public string AppDatabaseConnectionString { get; set; } = "";
+
+    /// <summary>
+    /// Agent'ın başlattığı dockertest container'larında EF migration çalışsın mı?
+    /// </summary>
+    public bool AppDatabaseAutoMigrate { get; set; } = true;
+
     public string ResolveToken() =>
         !string.IsNullOrWhiteSpace(GitHubToken)
             ? GitHubToken
