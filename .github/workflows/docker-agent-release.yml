@@ -5,6 +5,7 @@ on:
     branches: [master]
     paths:
       - dockertest-agent/**
+      - installer/**
       - .github/workflows/docker-agent-release.yml
 
 permissions:
@@ -42,12 +43,33 @@ jobs:
             ${{ steps.image.outputs.name }}:${{ steps.v.outputs.n }}
             ${{ steps.image.outputs.name }}:latest
 
+      - name: Windows installer paketi hazirla
+        run: |
+          VERSION=${{ steps.v.outputs.n }}
+          IMAGE=${{ steps.image.outputs.name }}
+          OUT=dist/dockertest-agent-installer-windows
+          mkdir -p "$OUT"
+          cp installer/windows/Kur.bat installer/windows/install.ps1 installer/windows/config.json installer/windows/OKU.txt installer/windows/Kaldir.bat "$OUT/"
+          sed -i "s|dockertest-agent:latest|dockertest-agent:${VERSION}|g" "$OUT/config.json"
+          sed -i "s|ghcr.io/hssn2/dockertest-agent:latest|${IMAGE}:${VERSION}|g" "$OUT/config.json"
+          (cd dist && zip -r dockertest-agent-installer-windows-v${VERSION}.zip dockertest-agent-installer-windows)
+
       - uses: softprops/action-gh-release@v2
         with:
           tag_name: agent-v${{ steps.v.outputs.n }}
           name: Agent v${{ steps.v.outputs.n }}
+          files: dist/dockertest-agent-installer-windows-v${{ steps.v.outputs.n }}.zip
           body: |
-            ## Docker
+            ## Windows sunucu kurulumu (repo gerekmez)
+
+            1. `dockertest-agent-installer-windows-v${{ steps.v.outputs.n }}.zip` indir
+            2. Klasore cikar
+            3. `Kur.bat` -> Yonetici olarak calistir
+            4. Tarayici: `http://SUNUCU-IP:8080`
+
+            Kurulum: Docker + PostgreSQL + Agent (port 8080). Ana uygulama agent uzerinden deploy edilir.
+
+            ## Docker (manuel)
 
             ```bash
             docker pull ${{ steps.image.outputs.name }}:${{ steps.v.outputs.n }}
@@ -57,5 +79,3 @@ jobs:
               -e Agent__AppDatabaseAutoMigrate=true \
               ${{ steps.image.outputs.name }}:${{ steps.v.outputs.n }}
             ```
-
-            Linux'ta Docker socket yolu farklı olabilir. Windows Docker Desktop'ta genelde `/var/run/docker.sock` mount edilir.
