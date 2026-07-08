@@ -98,6 +98,7 @@ jobs:
           New-Item -ItemType Directory -Path $outDir -Force | Out-Null
 
           Copy-Item installer/windows/config.json "$outDir/config.json"
+          Copy-Item installer/windows/install.ps1 "$outDir/install.ps1"
           Copy-Item installer/windows/Kur.bat "$outDir/Kur.bat"
           Copy-Item installer/windows/OKU.txt "$outDir/OKU.txt"
           Copy-Item installer/windows/Kaldir.bat "$outDir/Kaldir.bat"
@@ -108,14 +109,50 @@ jobs:
           $cfgText = $cfgText.Replace("ghcr.io/hssn2/dockertest-agent:latest", "$image:$version")
           Set-Content -Path $cfgPath -Value $cfgText -Encoding UTF8
 
-          Set-PSRepository -Name PSGallery -InstallationPolicy Trusted
-          Install-PackageProvider -Name NuGet -MinimumVersion 2.8.5.201 -Force
-          Install-Module ps2exe -Scope CurrentUser -Repository PSGallery -AllowClobber -Force
-          Invoke-ps2exe `
-            -inputFile "installer/windows/install.ps1" `
-            -outputFile "$outDir/Kurulum.exe" `
-            -title "dockertest Agent Kurulumu" `
-            -description "Docker, PostgreSQL ve Agent kurulum araci"
+          $launcherSource = @'
+          using System;
+          using System.Diagnostics;
+          using System.IO;
+
+          class Program
+          {
+              static int Main()
+              {
+                  try
+                  {
+                      var baseDir = AppDomain.CurrentDomain.BaseDirectory;
+                      var batPath = Path.Combine(baseDir, "Kur.bat");
+                      if (!File.Exists(batPath))
+                      {
+                          Console.Error.WriteLine("Kur.bat bulunamadi: " + batPath);
+                          return 1;
+                      }
+
+                      var psi = new ProcessStartInfo
+                      {
+                          FileName = batPath,
+                          WorkingDirectory = baseDir,
+                          UseShellExecute = true
+                      };
+
+                      var process = Process.Start(psi);
+                      if (process == null)
+                      {
+                          Console.Error.WriteLine("Kurulum baslatilamadi.");
+                          return 1;
+                      }
+
+                      return 0;
+                  }
+                  catch (Exception ex)
+                  {
+                      Console.Error.WriteLine(ex.ToString());
+                      return 1;
+                  }
+              }
+          }
+'@
+          Add-Type -TypeDefinition $launcherSource -Language CSharp -OutputAssembly "$outDir/Kurulum.exe" -OutputType ConsoleApplication
 
           Compress-Archive `
             -Path "$outDir/*" `
