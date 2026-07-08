@@ -109,49 +109,49 @@ jobs:
           $cfgText = $cfgText.Replace("ghcr.io/hssn2/dockertest-agent:latest", "$image:$version")
           Set-Content -Path $cfgPath -Value $cfgText -Encoding UTF8
 
-          $launcherSource = @'
-          using System;
-          using System.Diagnostics;
-          using System.IO;
-
-          class Program
-          {
-              static int Main()
-              {
-                  try
-                  {
-                      var baseDir = AppDomain.CurrentDomain.BaseDirectory;
-                      var batPath = Path.Combine(baseDir, "Kur.bat");
-                      if (!File.Exists(batPath))
-                      {
-                          Console.Error.WriteLine("Kur.bat bulunamadi: " + batPath);
-                          return 1;
-                      }
-
-                      var psi = new ProcessStartInfo
-                      {
-                          FileName = batPath,
-                          WorkingDirectory = baseDir,
-                          UseShellExecute = true
-                      };
-
-                      var process = Process.Start(psi);
-                      if (process == null)
-                      {
-                          Console.Error.WriteLine("Kurulum baslatilamadi.");
-                          return 1;
-                      }
-
-                      return 0;
-                  }
-                  catch (Exception ex)
-                  {
-                      Console.Error.WriteLine(ex.ToString());
-                      return 1;
-                  }
-              }
-          }
-'@
+          $launcherSource = @(
+            'using System;',
+            'using System.Diagnostics;',
+            'using System.IO;',
+            '',
+            'class Program',
+            '{',
+            '    static int Main()',
+            '    {',
+            '        try',
+            '        {',
+            '            var baseDir = AppDomain.CurrentDomain.BaseDirectory;',
+            '            var batPath = Path.Combine(baseDir, "Kur.bat");',
+            '            if (!File.Exists(batPath))',
+            '            {',
+            '                Console.Error.WriteLine("Kur.bat bulunamadi: " + batPath);',
+            '                return 1;',
+            '            }',
+            '',
+            '            var psi = new ProcessStartInfo',
+            '            {',
+            '                FileName = batPath,',
+            '                WorkingDirectory = baseDir,',
+            '                UseShellExecute = true',
+            '            };',
+            '',
+            '            var process = Process.Start(psi);',
+            '            if (process == null)',
+            '            {',
+            '                Console.Error.WriteLine("Kurulum baslatilamadi.");',
+            '                return 1;',
+            '            }',
+            '',
+            '            return 0;',
+            '        }',
+            '        catch (Exception ex)',
+            '        {',
+            '            Console.Error.WriteLine(ex.ToString());',
+            '            return 1;',
+            '        }',
+            '    }',
+            '}'
+          ) -join "`n"
           Add-Type -TypeDefinition $launcherSource -Language CSharp -OutputAssembly "$outDir/Kurulum.exe" -OutputType ConsoleApplication
 
           Compress-Archive `
