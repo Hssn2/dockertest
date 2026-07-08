@@ -107,8 +107,8 @@ jobs:
 
           $cfgPath = "$outDir/config.json"
           $cfgText = Get-Content $cfgPath -Raw
-          $cfgText = $cfgText.Replace("dockertest-agent:latest", "dockertest-agent:$version")
-          $cfgText = $cfgText.Replace("ghcr.io/hssn2/dockertest-agent:latest", "$image:$version")
+          $cfgText = $cfgText.Replace("dockertest-agent:latest", "dockertest-agent:" + $version)
+          $cfgText = $cfgText.Replace("ghcr.io/hssn2/dockertest-agent:latest", $image + ":" + $version)
           Set-Content -Path $cfgPath -Value $cfgText -Encoding UTF8
 
           $csprojText = @(
