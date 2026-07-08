@@ -110,7 +110,7 @@ jobs:
 
           Set-PSRepository -Name PSGallery -InstallationPolicy Trusted
           Install-PackageProvider -Name NuGet -MinimumVersion 2.8.5.201 -Force
-          Install-Module ps2exe -Scope CurrentUser -Force
+          Install-Module ps2exe -Scope CurrentUser -Repository PSGallery -AllowClobber -Force
           Invoke-ps2exe `
             -inputFile "installer/windows/install.ps1" `
             -outputFile "$outDir/Kurulum.exe" `
@@ -123,9 +123,7 @@ jobs:
             -Force
 
       - name: EXE paketini release'e ekle
-        env:
-          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-        shell: pwsh
-        run: |
-          $version = "${{ needs.release.outputs.version }}"
-          gh release upload "agent-v$version" "dist/dockertest-agent-installer-windows-exe-v$version.zip" --clobber
+        uses: softprops/action-gh-release@v2
+        with:
+          tag_name: agent-v${{ needs.release.outputs.version }}
+          files: dist/dockertest-agent-installer-windows-exe-v${{ needs.release.outputs.version }}.zip
