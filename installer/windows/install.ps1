@@ -8,7 +8,9 @@ param(
     [string]$ConfigPath = "",
     [switch]$SkipDocker,
     [switch]$SkipPostgres,
-    [switch]$SkipAgent
+    [switch]$SkipCatalog,
+    [switch]$SkipAgent,
+    [switch]$SkipAutoDeploy
 )
 
 $ErrorActionPreference = "Stop"
@@ -27,6 +29,13 @@ $AgentImage = [string]$config.AgentImage
 $AgentPort = [int]$config.AgentPort
 $AppHostPort = [int]$config.AppHostPort
 $AgentContainerName = [string]$config.AgentContainerName
+$CatalogImage = [string]$config.CatalogImage
+$CatalogPort = [int]$config.CatalogPort
+$CatalogContainerName = [string]$config.CatalogContainerName
+$CatalogVolumeName = [string]$config.CatalogVolumeName
+$AppDatabaseAutoMigrate = [bool]$config.AppDatabaseAutoMigrate
+$AgentCatalogUrl = [string]$config.AgentCatalogUrl
+$AutoDeployLatestFromCatalog = [bool]$config.AutoDeployLatestFromCatalog
 $PostgresUser = [string]$config.PostgresUser
 $PostgresPassword = [string]$config.PostgresPassword
 $PostgresDatabase = [string]$config.PostgresDatabase
@@ -82,6 +91,25 @@ function Wait-DockerReady {
         Start-Sleep -Seconds 2
     }
     throw "Docker calismiyor. Docker Desktop acik mi?"
+}
+
+function Wait-HttpReady {
+    param(
+        [string]$Url,
+        [int]$Retries = 30,
+        [int]$DelaySeconds = 2
+    )
+
+    for ($i = 1; $i -le $Retries; $i++) {
+        try {
+            $resp = Invoke-RestMethod -Method Get -Uri $Url -TimeoutSec 5
+            if ($null -ne $resp) { return $true }
+        }
+        catch { }
+        Start-Sleep -Seconds $DelaySeconds
+    }
+
+    return $false
 }
 
 function Find-PsqlPath {
@@ -184,6 +212,10 @@ function Install-AgentContainer {
     }
 
     $connectionString = "Host=host.docker.internal;Port=$PostgresPort;Database=$PostgresDatabase;Username=$PostgresUser;Password=$PostgresPassword"
+    $catalogUrl = $AgentCatalogUrl
+    if ([string]::IsNullOrWhiteSpace($catalogUrl)) {
+        $catalogUrl = "http://host.docker.internal:$CatalogPort"
+    }
 
     Write-Step "Agent baslatiliyor (port $AgentPort)..."
     docker run -d `
@@ -192,8 +224,9 @@ function Install-AgentContainer {
         -p "${AgentPort}:8080" `
         -v /var/run/docker.sock:/var/run/docker.sock `
         -e "Agent__AppHostPort=$AppHostPort" `
+        -e "Agent__CatalogUrl=$catalogUrl" `
         -e "Agent__AppDatabaseConnectionString=$connectionString" `
-        -e "Agent__AppDatabaseAutoMigrate=true" `
+        -e "Agent__AppDatabaseAutoMigrate=$($AppDatabaseAutoMigrate.ToString().ToLowerInvariant())" `
         $AgentImage | Out-Null
 
     Start-Sleep -Seconds 3
@@ -202,6 +235,73 @@ function Install-AgentContainer {
         docker logs $AgentContainerName
         throw "Agent baslatilamadi."
     }
+}
+
+function Install-CatalogContainer {
+    if ([string]::IsNullOrWhiteSpace($CatalogImage)) {
+        throw "CatalogImage bos olamaz."
+    }
+
+    Write-Step "Catalog image indiriliyor: $CatalogImage"
+    docker pull $CatalogImage
+
+    $existing = docker ps -a --filter "name=^/${CatalogContainerName}$" --format "{{.Names}}"
+    if ($existing) {
+        Write-Host "Eski catalog kaldiriliyor: $CatalogContainerName"
+        docker rm -f $CatalogContainerName | Out-Null
+    }
+
+    Write-Step "Catalog baslatiliyor (port $CatalogPort)..."
+    docker run -d `
+        --name $CatalogContainerName `
+        --restart unless-stopped `
+        -p "${CatalogPort}:8090" `
+        -v "${CatalogVolumeName}:/app/wwwroot/releases" `
+        -e "Catalog__PublicBaseUrl=http://host.docker.internal:$CatalogPort" `
+        $CatalogImage | Out-Null
+
+    if (-not (Wait-HttpReady -Url "http://localhost:$CatalogPort/api/health" -Retries 40 -DelaySeconds 2)) {
+        Write-Host "Catalog log:" -ForegroundColor Red
+        docker logs $CatalogContainerName
+        throw "Catalog baslatilamadi."
+    }
+}
+
+function Get-LatestCatalogVersion {
+    param([string]$BaseUrl)
+
+    $uri = "$BaseUrl/api/releases"
+    $response = Invoke-RestMethod -Method Get -Uri $uri -TimeoutSec 15
+    $items = @($response.items)
+    if ($items.Count -eq 0) {
+        return $null
+    }
+
+    $latest = $items |
+        Where-Object { $_.version -match '^\d+\.\d+\.\d+$' } |
+        Sort-Object { [Version]$_.version } -Descending |
+        Select-Object -First 1
+
+    return $latest.version
+}
+
+function Deploy-LatestFromCatalog {
+    Write-Step "Catalog'daki son surum agent ile deploy ediliyor..."
+
+    if (-not (Wait-HttpReady -Url "http://localhost:$AgentPort/api/status" -Retries 40 -DelaySeconds 2)) {
+        throw "Agent API hazir degil: http://localhost:$AgentPort/api/status"
+    }
+
+    $catalogApi = "http://localhost:$CatalogPort"
+    $latestVersion = Get-LatestCatalogVersion -BaseUrl $catalogApi
+    if ([string]::IsNullOrWhiteSpace($latestVersion)) {
+        Write-Host "Catalog'da surum bulunamadi. Deploy atlandi." -ForegroundColor Yellow
+        return
+    }
+
+    Write-Host "Son surum bulundu: $latestVersion"
+    Invoke-RestMethod -Method Post -Uri "http://localhost:$AgentPort/api/deploy/$latestVersion" -TimeoutSec 30 | Out-Null
+    Write-Host "Deploy tetiklendi. Durum: http://localhost:$AgentPort"
 }
 
 Clear-Host
@@ -220,8 +320,16 @@ if (-not $SkipPostgres) {
     Initialize-PostgreSqlDatabase -PsqlPath $psqlPath
 }
 
+if (-not $SkipCatalog) {
+    Install-CatalogContainer
+}
+
 if (-not $SkipAgent) {
     Install-AgentContainer
+}
+
+if (-not $SkipAutoDeploy -and $AutoDeployLatestFromCatalog) {
+    Deploy-LatestFromCatalog
 }
 
 $hostName = $env:COMPUTERNAME
@@ -229,6 +337,7 @@ Write-Host ""
 Write-Host "Kurulum tamamlandi." -ForegroundColor Green
 Write-Host ""
 Write-Host "  Agent  : http://${hostName}:${AgentPort}  (veya http://localhost:${AgentPort})"
-Write-Host "  Sonraki adim: Agent ekranindan surum secip Deploy et"
+Write-Host "  Catalog: http://${hostName}:${CatalogPort}  (veya http://localhost:${CatalogPort})"
+Write-Host "  Sonraki adim: Agent ekranindan deploy durumunu kontrol et"
 Write-Host "  Uygulama portu: $AppHostPort (deploy sonrasi)"
 Write-Host ""

@@ -1,5 +1,5 @@
-dockertest Agent - Windows Sunucu Kurulum Paketi
-================================================
+dockertest Agent + Catalog - Windows Sunucu Kurulum Paketi
+==========================================================
 
 Bu paket repoya ihtiyac duymaz. Sadece sunucuda calistir.
 
@@ -13,18 +13,23 @@ KURULUM
 KULLANIM
 --------
 1. Tarayicida ac: http://SUNUCU-IP:8080
-2. Agent ekranindan surum sec ve Deploy et
-3. Uygulama port 80'de acilir: http://SUNUCU-IP
+2. Catalog acik: http://SUNUCU-IP:8090
+3. Script, catalogdaki son surumu otomatik deploy etmeyi dener
+4. Uygulama port 80'de acilir: http://SUNUCU-IP
 
 AYARLAR
 -------
 config.json dosyasindan degistirebilirsin:
   - AgentImage      : agent docker image (or. ghcr.io/hssn2/dockertest-agent:3)
+  - CatalogImage    : catalog docker image
   - PostgresPassword: veritabani sifresi
   - AgentPort       : agent arayuzu (varsayilan 8080)
+  - CatalogPort     : catalog arayuzu (varsayilan 8090)
+  - AutoDeployLatestFromCatalog: true ise catalogdan son surumu deploy eder
 
 NOT
 ---
-- PostgreSQL ve Agent bu kurulumda yuklenir
+- PostgreSQL, Catalog ve Agent bu kurulumda yuklenir
 - Ana uygulama (dockertest) agent uzerinden deploy edilir
 - Agent, deploy sirasinda DB ayarlarini otomatik gecirir
+- Catalogda surum yoksa otomatik deploy atlanir; cataloga .tar.gz yukleyip agentdan deploy edebilirsin
