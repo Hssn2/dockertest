@@ -1,9 +1,44 @@
+using dockertest.Data;
+using Microsoft.EntityFrameworkCore;
+
 var builder = WebApplication.CreateBuilder(args);
+
+builder.Services.Configure<DatabaseOptions>(
+    builder.Configuration.GetSection(DatabaseOptions.SectionName));
+
+var databaseOptions = builder.Configuration
+    .GetSection(DatabaseOptions.SectionName)
+    .Get<DatabaseOptions>();
+
+if (!string.IsNullOrWhiteSpace(databaseOptions?.ConnectionString))
+{
+    builder.Services.AddDbContext<AppDbContext>(options =>
+        options.UseNpgsql(databaseOptions.ConnectionString));
+}
 
 // Add services to the container.
 builder.Services.AddControllersWithViews();
 
 var app = builder.Build();
+
+if (databaseOptions?.AutoMigrate == true)
+{
+    using var scope = app.Services.CreateScope();
+    var logger = scope.ServiceProvider.GetRequiredService<ILoggerFactory>().CreateLogger("Database");
+
+    try
+    {
+        var dbContext = scope.ServiceProvider.GetRequiredService<AppDbContext>();
+        logger.LogInformation("Applying database migrations...");
+        dbContext.Database.Migrate();
+        logger.LogInformation("Database migrations applied.");
+    }
+    catch (Exception ex)
+    {
+        logger.LogCritical(ex, "Database migration failed. Check ConnectionString and PostgreSQL reachability.");
+        throw;
+    }
+}
 
 // Configure the HTTP request pipeline.
 if (!app.Environment.IsDevelopment())

@@ -1,0 +1,30 @@
+dockertest Agent - Windows Sunucu Kurulum Paketi
+================================================
+
+Bu paket repoya ihtiyac duymaz. Sadece sunucuda calistir.
+
+KURULUM
+-------
+1. Bu klasoru sunucuya kopyala (zip'ten cikar)
+2. Kur.bat dosyasina sag tik -> Yonetici olarak calistir
+3. Docker ilk kez kurulduysa bilgisayari yeniden baslat, Docker Desktop ac
+4. Kur.bat'i tekrar calistir (Docker zaten varsa devam eder)
+
+KULLANIM
+--------
+1. Tarayicida ac: http://SUNUCU-IP:8080
+2. Agent ekranindan surum sec ve Deploy et
+3. Uygulama port 80'de acilir: http://SUNUCU-IP
+
+AYARLAR
+-------
+config.json dosyasindan degistirebilirsin:
+  - AgentImage      : agent docker image (or. ghcr.io/hssn2/dockertest-agent:3)
+  - PostgresPassword: veritabani sifresi
+  - AgentPort       : agent arayuzu (varsayilan 8080)
+
+NOT
+---
+- PostgreSQL ve Agent bu kurulumda yuklenir
+- Ana uygulama (dockertest) agent uzerinden deploy edilir
+- Agent, deploy sirasinda DB ayarlarini otomatik gecirir

@@ -59,8 +59,11 @@ async function loadReleases() {
 
     if (!releases.length) {
         const hint = data.hint || data.error || 'Release bulunamadı.';
+        const isCatalog = data.source === 'catalog';
         const isRateLimit = (hint + (data.error || '')).toLowerCase().includes('rate limit');
-        const tokenNote = isRateLimit
+        const tokenNote = isCatalog
+            ? '<br><br><strong>Çözüm:</strong> Catalog paneline git (8090), <code>dockertest-x.y.z.tar.gz</code> yükle.'
+            : isRateLimit
             ? `<br><br><strong>Çözüm:</strong> GitHub PAT oluştur ve agent'a ver:<br>
                <code>-e Agent__GitHubToken=ghp_xxx</code><br>
                <small>Settings → Developer settings → PAT → public_repo işaretle</small>`
@@ -72,6 +75,7 @@ async function loadReleases() {
     }
 
     const sourceLabels = {
+        'catalog': 'Release Kataloğu (.tar.gz)',
         'github-releases': 'GitHub Releases',
         'github-tags': 'GitHub Tags',
         'github-packages': 'GHCR Packages',

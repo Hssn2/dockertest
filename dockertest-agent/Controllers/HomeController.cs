@@ -12,14 +12,14 @@ public class HomeController : Controller
 [Route("api")]
 public class UpdateApiController : ControllerBase
 {
-    private readonly GitHubReleaseService _releases;
+    private readonly ReleaseService _releases;
     private readonly DockerService _docker;
     private readonly UpdateOrchestrator _orchestrator;
     private readonly UpdateStateStore _store;
     private readonly AgentOptions _options;
 
     public UpdateApiController(
-        GitHubReleaseService releases,
+        ReleaseService releases,
         DockerService docker,
         UpdateOrchestrator orchestrator,
         UpdateStateStore store,

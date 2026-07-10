@@ -5,6 +5,7 @@ on:
     branches: [master]
     paths:
       - dockertest-agent/**
+      - installer/**
       - .github/workflows/docker-agent-release.yml
 
 permissions:
@@ -78,12 +79,46 @@ jobs:
           docker push "${image}:${version}-windows"
           docker push "${image}:latest-windows"
 
+      - name: Windows installer paketi hazirla
+        run: |
+          VERSION=${{ steps.v.outputs.n }}
+          IMAGE=${{ steps.image.outputs.name }}
+          OUT=dist/dockertest-agent-installer-windows
+          mkdir -p "$OUT"
+          cp installer/windows/Kur.bat installer/windows/install.ps1 installer/windows/config.json installer/windows/OKU.txt installer/windows/Kaldir.bat "$OUT/"
+          sed -i "s|dockertest-agent:latest|dockertest-agent:${VERSION}|g" "$OUT/config.json"
+          sed -i "s|ghcr.io/hssn2/dockertest-agent:latest|${IMAGE}:${VERSION}|g" "$OUT/config.json"
+          (cd dist && zip -r dockertest-agent-installer-windows-v${VERSION}.zip dockertest-agent-installer-windows)
+
   release:
     needs: [prepare, build-linux, build-windows]
     runs-on: ubuntu-latest
     steps:
       - uses: softprops/action-gh-release@v2
         with:
+          tag_name: agent-v${{ steps.v.outputs.n }}
+          name: Agent v${{ steps.v.outputs.n }}
+          files: dist/dockertest-agent-installer-windows-v${{ steps.v.outputs.n }}.zip
+          body: |
+            ## Windows sunucu kurulumu (repo gerekmez)
+
+            1. `dockertest-agent-installer-windows-v${{ steps.v.outputs.n }}.zip` indir
+            2. Klasore cikar
+            3. `Kur.bat` -> Yonetici olarak calistir
+            4. Tarayici: `http://SUNUCU-IP:8080`
+
+            Kurulum: Docker + PostgreSQL + Agent (port 8080). Ana uygulama agent uzerinden deploy edilir.
+
+            ## Docker (manuel)
+
+            ```bash
+            docker pull ${{ steps.image.outputs.name }}:${{ steps.v.outputs.n }}
+            docker run -d -p 8080:8080 \
+              -v /var/run/docker.sock:/var/run/docker.sock \
+              -e Agent__AppDatabaseConnectionString="Host=host.docker.internal;Port=5432;Database=dockertest;Username=sa;Password=sa123" \
+              -e Agent__AppDatabaseAutoMigrate=true \
+              ${{ steps.image.outputs.name }}:${{ steps.v.outputs.n }}
+            ```
           tag_name: agent-v${{ needs.prepare.outputs.version }}
           name: Agent v${{ needs.prepare.outputs.version }}
           body: |

@@ -1,0 +1,10 @@
+{
+  "AgentImage": "ghcr.io/hssn2/dockertest-agent:latest",
+  "AgentPort": 8080,
+  "AppHostPort": 80,
+  "AgentContainerName": "dockertest-agent",
+  "PostgresUser": "sa",
+  "PostgresPassword": "sa123",
+  "PostgresDatabase": "dockertest",
+  "PostgresPort": 5432
+}

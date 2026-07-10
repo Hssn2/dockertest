@@ -364,3 +364,7 @@ FodyWeavers.xsd
 
 # Update agent runtime state
 dockertest-agent/agent-state.json
+
+# Release archives (büyük dosyalar — kataloğa manuel kopyala)
+dockertest-catalog/wwwroot/releases/*.tar.gz
+dockertest-catalog/wwwroot/releases/*.tar
