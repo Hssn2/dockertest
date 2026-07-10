@@ -13,6 +13,8 @@ namespace dockertest.Controllers
             _configuration = configuration;
         }
 
+
+        //a
         public IActionResult Index()
         {
             ViewBag.AppVersion = Environment.GetEnvironmentVariable("APP_VERSION") ?? "dev";

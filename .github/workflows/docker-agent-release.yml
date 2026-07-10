@@ -79,30 +79,46 @@ jobs:
           docker push "${image}:${version}-windows"
           docker push "${image}:latest-windows"
 
+  package-installer:
+    needs: prepare
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
       - name: Windows installer paketi hazirla
         run: |
-          VERSION=${{ steps.v.outputs.n }}
-          IMAGE=${{ steps.image.outputs.name }}
+          VERSION=${{ needs.prepare.outputs.version }}
+          IMAGE=${{ needs.prepare.outputs.image }}
           OUT=dist/dockertest-agent-installer-windows
           mkdir -p "$OUT"
           cp installer/windows/Kur.bat installer/windows/install.ps1 installer/windows/config.json installer/windows/OKU.txt installer/windows/Kaldir.bat "$OUT/"
-          sed -i "s|dockertest-agent:latest|dockertest-agent:${VERSION}|g" "$OUT/config.json"
-          sed -i "s|ghcr.io/hssn2/dockertest-agent:latest|${IMAGE}:${VERSION}|g" "$OUT/config.json"
+          sed -i "s|dockertest-agent:latest|dockertest-agent:${VERSION}-windows|g" "$OUT/config.json"
+          sed -i "s|ghcr.io/hssn2/dockertest-agent:latest|${IMAGE}:${VERSION}-windows|g" "$OUT/config.json"
           (cd dist && zip -r dockertest-agent-installer-windows-v${VERSION}.zip dockertest-agent-installer-windows)
 
+      - uses: actions/upload-artifact@v4
+        with:
+          name: windows-installer
+          path: dist/dockertest-agent-installer-windows-v${{ needs.prepare.outputs.version }}.zip
+
   release:
-    needs: [prepare, build-linux, build-windows]
+    needs: [prepare, build-linux, build-windows, package-installer]
     runs-on: ubuntu-latest
     steps:
+      - uses: actions/download-artifact@v4
+        with:
+          name: windows-installer
+          path: dist
+
       - uses: softprops/action-gh-release@v2
         with:
-          tag_name: agent-v${{ steps.v.outputs.n }}
-          name: Agent v${{ steps.v.outputs.n }}
-          files: dist/dockertest-agent-installer-windows-v${{ steps.v.outputs.n }}.zip
+          tag_name: agent-v${{ needs.prepare.outputs.version }}
+          name: Agent v${{ needs.prepare.outputs.version }}
+          files: dist/dockertest-agent-installer-windows-v${{ needs.prepare.outputs.version }}.zip
           body: |
             ## Windows sunucu kurulumu (repo gerekmez)
 
-            1. `dockertest-agent-installer-windows-v${{ steps.v.outputs.n }}.zip` indir
+            1. `dockertest-agent-installer-windows-v${{ needs.prepare.outputs.version }}.zip` indir
             2. Klasore cikar
             3. `Kur.bat` -> Yonetici olarak calistir
             4. Tarayici: `http://SUNUCU-IP:8080`
@@ -111,18 +127,21 @@ jobs:
 
             ## Docker (manuel)
 
+            Linux:
             ```bash
-            docker pull ${{ steps.image.outputs.name }}:${{ steps.v.outputs.n }}
+            docker pull ${{ needs.prepare.outputs.image }}:${{ needs.prepare.outputs.version }}-linux
             docker run -d -p 8080:8080 \
               -v /var/run/docker.sock:/var/run/docker.sock \
               -e Agent__AppDatabaseConnectionString="Host=host.docker.internal;Port=5432;Database=dockertest;Username=sa;Password=sa123" \
               -e Agent__AppDatabaseAutoMigrate=true \
-              ${{ steps.image.outputs.name }}:${{ steps.v.outputs.n }}
+              ${{ needs.prepare.outputs.image }}:${{ needs.prepare.outputs.version }}-linux
             ```
-          tag_name: agent-v${{ needs.prepare.outputs.version }}
-          name: Agent v${{ needs.prepare.outputs.version }}
-          body: |
-            ## Docker
 
-            - Linux: `${{ needs.prepare.outputs.image }}:${{ needs.prepare.outputs.version }}-linux`
-            - Windows (Server 2019): `${{ needs.prepare.outputs.image }}:${{ needs.prepare.outputs.version }}-windows`
+            Windows (Server 2019):
+            ```powershell
+            docker pull ${{ needs.prepare.outputs.image }}:${{ needs.prepare.outputs.version }}-windows
+            docker run -d -p 8080:8080 `
+              -e Agent__AppDatabaseConnectionString="Host=host.docker.internal;Port=5432;Database=dockertest;Username=sa;Password=sa123" `
+              -e Agent__AppDatabaseAutoMigrate=true `
+              ${{ needs.prepare.outputs.image }}:${{ needs.prepare.outputs.version }}-windows
+            ```
