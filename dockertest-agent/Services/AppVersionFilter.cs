@@ -24,4 +24,16 @@ public static partial class AppVersionFilter
         var repo = repoTag[..colon];
         return string.Equals(repo, imageName, StringComparison.OrdinalIgnoreCase);
     }
+
+    public static string? ParseVersionFromDockerTag(string dockerTag, string imageTagSuffix)
+    {
+        var tag = dockerTag;
+        if (!string.IsNullOrEmpty(imageTagSuffix)
+            && tag.EndsWith(imageTagSuffix, StringComparison.OrdinalIgnoreCase))
+        {
+            tag = tag[..^imageTagSuffix.Length];
+        }
+
+        return IsAppVersion(tag) ? tag : null;
+    }
 }

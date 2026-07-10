@@ -53,11 +53,12 @@ public class DockerService
 
     public async Task PullImageAsync(string version, IProgress<string>? progress, CancellationToken ct)
     {
-        var image = $"{_options.ImageName}:{version}";
+        var tag = _options.ResolveImageTag(version);
+        var image = $"{_options.ImageName}:{tag}";
         progress?.Report($"Image indiriliyor: {image}");
 
         await _client.Images.CreateImageAsync(
-            new ImagesCreateParameters { FromImage = _options.ImageName, Tag = version },
+            new ImagesCreateParameters { FromImage = _options.ImageName, Tag = tag },
             null,
             new Progress<JSONMessage>(msg =>
             {
@@ -69,7 +70,7 @@ public class DockerService
 
     public async Task<string> RunContainerAsync(string name, int hostPort, string version, CancellationToken ct)
     {
-        var image = $"{_options.ImageName}:{version}";
+        var image = $"{_options.ImageName}:{_options.ResolveImageTag(version)}";
         var parameters = new CreateContainerParameters
         {
             Image = image,
@@ -133,7 +134,7 @@ public class DockerService
     public async Task<bool> ImageExistsLocallyAsync(string version, CancellationToken ct)
     {
         var images = await _client.Images.ListImagesAsync(new ImagesListParameters { All = true }, ct);
-        var tag = $"{_options.ImageName}:{version}".ToLowerInvariant();
+        var tag = $"{_options.ImageName}:{_options.ResolveImageTag(version)}".ToLowerInvariant();
         return images.Any(i => i.RepoTags?.Any(t => string.Equals(t, tag, StringComparison.OrdinalIgnoreCase)) == true);
     }
 
@@ -150,13 +151,15 @@ public class DockerService
                 if (!AppVersionFilter.IsExactImageRepo(repoTag, imageName))
                     continue;
 
-                var tag = repoTag[(repoTag.LastIndexOf(':') + 1)..];
-                if (tag.Equals("latest", StringComparison.OrdinalIgnoreCase))
-                    continue;
-                if (!AppVersionFilter.IsAppVersion(tag))
+                var dockerTag = repoTag[(repoTag.LastIndexOf(':') + 1)..];
+                if (dockerTag.StartsWith("latest", StringComparison.OrdinalIgnoreCase))
                     continue;
 
-                tags.Add(tag);
+                var version = AppVersionFilter.ParseVersionFromDockerTag(dockerTag, _options.ImageTagSuffix);
+                if (version == null)
+                    continue;
+
+                tags.Add(version);
             }
         }
 

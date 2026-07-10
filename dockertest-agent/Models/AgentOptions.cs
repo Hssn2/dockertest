@@ -5,6 +5,8 @@ public class AgentOptions
     public const string SectionName = "Agent";
 
     public string ImageName { get; set; } = "ghcr.io/hssn2/dockertest";
+    /// <summary>Docker image tag suffix, e.g. "-windows" or "-linux". Release version stays 0.0.1; pull uses 0.0.1-windows.</summary>
+    public string ImageTagSuffix { get; set; } = "";
     public int AppHostPort { get; set; } = 80;
     public int AppContainerPort { get; set; } = 8080;
     public string ContainerNamePrefix { get; set; } = "dockertest_";
@@ -28,4 +30,6 @@ public class AgentOptions
             return HealthCheckHost;
         return File.Exists("/.dockerenv") ? "host.docker.internal" : "localhost";
     }
+
+    public string ResolveImageTag(string version) => $"{version}{ImageTagSuffix}";
 }
